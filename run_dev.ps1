@@ -1,6 +1,6 @@
-# FDR-Sentinel One-Click Launcher for Windows
+# Prama One-Click Launcher for Windows
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  AICTE REGULATION BUREAU - FDR-SENTINEL PLATFORM" -ForegroundColor Yellow
+Write-Host "  AICTE REGULATION BUREAU - PRAMA PLATFORM" -ForegroundColor Yellow
 Write-Host "  Smart India Hackathon (SIH PS 26265)" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
 

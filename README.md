@@ -1,4 +1,4 @@
-# FDR-Sentinel: AICTE Regulation Bureau Terminal
+# Prama: AICTE Regulation Bureau Terminal
 
 <div align="center">
 
@@ -7,8 +7,10 @@
 ![Category](https://img.shields.io/badge/Category-Software_%2F_Smart_Automation-138808?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Tests-18%2F18_Passing-success?style=for-the-badge)
 
-**A Trust-Scored, Tamper-Evident Security Deposit & Fixed Deposit Receipt (FDR) Lifecycle Platform**  
+**Prama (प्रमा) — Valid Knowledge, Truth & Sovereign Trust**  
 *Turning passive document archiving into active cryptographic trust, forensic discrepancy detection, and regulatory risk intelligence.*
+
+> **Etymology & Philosophy**: In Indian epistemology (*Nyāya Darśana*), **Pramā (प्रमा)** signifies *uncontradicted, genuine truth and verified knowledge* acquired through rigorous proof (*Pramāṇa*). Prama transforms statutory document monitoring from blind clerical trust into mathematically verifiable truth.
 
 [Architecture](#-system-architecture) • [Core Innovations](#-core-innovations-the-9-jury-wow-factors) • [Quick Start](#-quick-start--installation) • [4-Minute Jury Walkthrough](#-live-sih-jury-demo-script-4-minutes) • [Rubric Mapping](#-sih-ps-26265-compliance-matrix)
 
@@ -28,8 +30,8 @@ When managed across fragmented spreadsheets, manual courier mail, and siloed sta
 4. **Internal Vulnerability & Silent Tampering**: Relational databases lack cryptographic provenance; a compromised database account could alter status or deposit figures with zero forensic trail.
 5. **No Unified Bank Verification API**: Commercial banks lack a common standardized public API for real-time deposit verification.
 
-### The FDR-Sentinel Solution
-**FDR-Sentinel** is not a passive CRUD database. It is an active **Regulatory Cockpit and Cryptographic Trust Terminal** that:
+### The Prama Solution
+**Prama** is not a passive CRUD database. It is an active **Regulatory Cockpit and Cryptographic Trust Terminal** that:
 - Differentiates institution claims from independent bank confirmation using a **Four-Tier Provenance Matrix**.
 - Verifies physical/digital FDRs in **12 milliseconds offline** using bank-signed **Ed25519 QR Codes**.
 - Maps hidden syndicate fraud networks using an interactive **Vector Graph Topology**.
@@ -39,9 +41,9 @@ When managed across fragmented spreadsheets, manual courier mail, and siloed sta
 
 ---
 
-## Key Differentiators: Generic Portals vs. FDR-Sentinel
+## Key Differentiators: Generic Portals vs. Prama
 
-| Dimension | Typical Generic Hackathon Project | FDR-Sentinel (AICTE Regulation Bureau) |
+| Dimension | Typical Generic Hackathon Project | Prama (AICTE Regulation Bureau) |
 |---|---|---|
 | **Data Authenticity** | Blindly trusts form uploads and basic OCR text. | **Four-Tier Provenance Matrix**: Flags data source (`Self-Declared` $\to$ `Doc-Extracted` $\to$ `Cross-Validated` $\to$ `Bank-Confirmed`). |
 | **Bank Verification** | Proposes fictional/unrealistic direct core-banking APIs. | **Deployable Ed25519 Signed QR Code** (12ms offline verification) + Tokenized One-Time OTP Verification Link fallback for legacy paper receipts. |
@@ -79,7 +81,7 @@ When managed across fragmented spreadsheets, manual courier mail, and siloed sta
 ```
 
 ### 1. Four-Tier Provenance Matrix
-FDR-Sentinel directly implements AICTE's requirement to clearly separate what an applicant college asserts from what has been independently established:
+Prama directly implements AICTE's requirement to clearly separate what an applicant college asserts from what has been independently established:
 - **Tier 1 (Self-Declared)**: Initial form submission values.
 - **Tier 2 (Doc-Extracted)**: Extracted via OCR with bounding box coordinates and substring hallucination guards.
 - **Tier 3 (Cross-Validated)**: Automated verification against statutory rules (bank IFSC regex, tenure/maturity math, minimum statutory deposit).
@@ -99,7 +101,7 @@ A synchronized dual-pane inspection interface for Scrutiny Officers:
 - **Binary Document Fingerprinting**: Computes exact SHA-256 hashes of uploaded files to detect binary duplicate re-submissions across colleges.
 
 ### 4. Syndicate Collusion & Fraud Ring Graph
-Traditional portals evaluate applications in isolation. FDR-Sentinel features a hardware-accelerated vector graph built on `@xyflow/react`:
+Traditional portals evaluate applications in isolation. Prama features a hardware-accelerated vector graph built on `@xyflow/react`:
 - Dynamically clusters **Colleges**, **FDR Serials**, **Bank Branches**, and **Document Hashes**.
 - Automatically exposes multi-college syndicates where colluding institutions pledge duplicate FDR receipts or re-use identical scanned PDF attachments to secure fraudulent AICTE approvals.
 
@@ -257,7 +259,7 @@ Designed for rapid, high-impact demonstration during hackathon evaluation rounds
 2. Watch the interactive vector graph automatically render clusters across India.
 3. Click the glowing red **Detected Syndicate Collusion** ring:
    - Exposes **4 technical colleges** across Maharashtra and Gujarat all pledging the exact same FDR serial (`SBIN/2026/APEX-SYNDICATE-99214`) and binary PDF hash.
-   - *Key Talking Point*: "When files are reviewed in isolation, cross-institution collusion is invisible. FDR-Sentinel's graph algorithm spots multi-state fraud rings automatically."
+   - *Key Talking Point*: "When files are reviewed in isolation, cross-institution collusion is invisible. Prama's graph algorithm spots multi-state fraud rings automatically."
 
 ### Minute 2:30 - 3:15: The Regulation Time Machine (Clock Travel)
 1. Direct attention to the top navigation bar: `Simulated Date: 2026-10-26`.
@@ -299,7 +301,7 @@ Designed for rapid, high-impact demonstration during hackathon evaluation rounds
 
 ## SIH PS 26265 Compliance Matrix
 
-| Requirement from AICTE Problem Statement | Implementation in FDR-Sentinel | Relevant Endpoint / View |
+| Requirement from AICTE Problem Statement | Implementation in Prama | Relevant Endpoint / View |
 |---|---|---|
 | **1. Centralized Repository** | Multi-institution database tracking status, bank IFSC, amounts, and validity dates. | `/api/v1/instruments`, `/queue` |
 | **2. Digital Document Management** | Encrypted local storage vault with PDF extraction and SHA-256 binary hash checks. | `backend/storage_vault/`, `/inspector/[id]` |

@@ -1,4 +1,4 @@
-# FDR-Sentinel: Product Requirements Document (PRD)
+# Prama: Product Requirements Document (PRD)
 **SIH PS 26265 – Streamline of Security Deposit / FDR Portal (AICTE Regulation Bureau)**
 Audience: AI coding agent + student team. Goal: a working, demo-able prototype where every number on screen is computed from real data in the database. No hardcoded dashboards.
 
@@ -71,7 +71,7 @@ Auth: JWT login with email + password (+ optional OTP via mock SMS). Enforce RBA
 ## 6. Repository structure
 
 ```
-fdr-sentinel/
+prama/
   docker-compose.yml  Makefile  README.md
   backend/app/{api,core,models,services,rules,forensics,jobs,schemas}/
   backend/tests/

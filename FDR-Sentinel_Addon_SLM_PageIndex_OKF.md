@@ -1,6 +1,6 @@
-# FDR-Sentinel Add-on Spec: Local SLM + PageIndex Compliance Copilot + OKF Knowledge Bundle
+# Prama Add-on Spec: Local SLM + PageIndex Compliance Copilot + OKF Knowledge Bundle
 
-Applies to the **already working** FDR-Sentinel solution (FastAPI backend, Next.js frontend, PostgreSQL, Celery/Redis, MinIO, PaddleOCR, rules engine, hash-chained audit, mock services).
+Applies to the **already working** Prama solution (FastAPI backend, Next.js frontend, PostgreSQL, Celery/Redis, MinIO, PaddleOCR, rules engine, hash-chained audit, mock services).
 Audience: AI coding agent + team. This is an **additive** change: do not break or rewrite existing modules.
 
 ---

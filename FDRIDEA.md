@@ -1,4 +1,4 @@
-# FDR-Sentinel
+# Prama
 ### A Trust-Scored, Tamper-Evident Security Deposit / FDR Lifecycle Platform for AICTE
 
 **Smart India Hackathon | PS 26265 – Streamline of Security Deposit / FDR Portal**
@@ -42,7 +42,7 @@ This is not a data-entry problem. It is a **trust, time and accountability** pro
 
 ## 4. Our solution
 
-FDR-Sentinel is a centralized portal with five core ideas that together convert a record-keeping system into a **decision-support and trust system**.
+Prama is a centralized portal with five core ideas that together convert a record-keeping system into a **decision-support and trust system**.
 
 ### Innovation 1 – Provenance-tagged trust tiers
 Every field of every FDR carries its source:
@@ -175,7 +175,7 @@ We demonstrate a **live, database-driven prototype**, not static screens:
 
 ## 11. Measurable impact
 
-| PS expectation | How FDR-Sentinel shows it |
+| PS expectation | How Prama shows it |
 |---|---|
 | Record accuracy | Provenance + validation rules reduce unverified fields; trust-tier distribution |
 | Verification turnaround | Time from submission to verified: automated vs manual path |
@@ -185,7 +185,7 @@ We demonstrate a **live, database-driven prototype**, not static screens:
 
 ## 12. Novelty summary: what we do differently
 
-| Generic solution | FDR-Sentinel |
+| Generic solution | Prama |
 |---|---|
 | Stores documents | Assigns a **trust tier** to every field |
 | Assumes bank API exists | **Signed-QR + verify-link** deployable today |

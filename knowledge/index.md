@@ -1,6 +1,6 @@
 ---
 type: index
-title: FDR-Sentinel Open Knowledge Format (OKF) Navigation Index
+title: Prama Open Knowledge Format (OKF) Navigation Index
 version: 0.1.0
 department: AICTE Regulation Bureau
 ---
