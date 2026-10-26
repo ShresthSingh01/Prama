@@ -7,6 +7,16 @@ from backend.app.core.crypto import canonical_json, compute_chain_hash
 
 GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
 
+# In-memory cache for fast verification checks
+_AUDIT_CACHE: Dict[str, Any] = {
+    "latest_id": None,
+    "latest_hash": None,
+    "result": None
+}
+
+def invalidate_audit_cache():
+    _AUDIT_CACHE["result"] = None
+
 def get_latest_audit_hash(db: Session) -> str:
     latest = db.query(AuditLog).order_by(AuditLog.id.desc()).first()
     return latest.hash if latest else GENESIS_HASH
@@ -21,6 +31,7 @@ def log_audit_entry(
     actor_role: Optional[str] = None
 ) -> AuditLog:
     """Appends an immutable, cryptographic SHA-256 hash-chained log entry."""
+    invalidate_audit_cache()
     prev_hash = get_latest_audit_hash(db)
     
     full_payload = {
@@ -50,18 +61,24 @@ def log_audit_entry(
     db.refresh(entry)
     return entry
 
-def verify_audit_chain(db: Session) -> Dict[str, Any]:
+def verify_audit_chain(db: Session, force_recompute: bool = False) -> Dict[str, Any]:
     """
     Verifies the cryptographic integrity of the entire audit chain.
-    Returns status, total entries checked, and the first broken block ID if compromised.
+    Uses cached result if chain state (latest ID and latest hash) has not mutated.
     """
-    entries = db.query(AuditLog).order_by(AuditLog.id.asc()).all()
-    if not entries:
+    latest = db.query(AuditLog).order_by(AuditLog.id.desc()).first()
+    if not latest:
         return {
             "valid": True,
             "total_entries": 0,
             "message": "Audit chain empty. Genesis state valid."
         }
+        
+    if not force_recompute and _AUDIT_CACHE["result"] is not None:
+        if _AUDIT_CACHE["latest_id"] == latest.id and _AUDIT_CACHE["latest_hash"] == latest.hash:
+            return _AUDIT_CACHE["result"]
+
+    entries = db.query(AuditLog).order_by(AuditLog.id.asc()).all()
     
     expected_prev_hash = GENESIS_HASH
     for i, entry in enumerate(entries):
@@ -87,9 +104,13 @@ def verify_audit_chain(db: Session) -> Dict[str, Any]:
         
         expected_prev_hash = entry.hash
         
-    return {
+    result = {
         "valid": True,
         "total_entries": len(entries),
         "latest_hash": expected_prev_hash,
         "message": f"Cryptographic integrity verified: all {len(entries)} audit blocks strictly untampered."
     }
+    _AUDIT_CACHE["latest_id"] = latest.id
+    _AUDIT_CACHE["latest_hash"] = latest.hash
+    _AUDIT_CACHE["result"] = result
+    return result

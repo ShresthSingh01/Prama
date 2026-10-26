@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   ListFilter, Search, ShieldAlert, AlertTriangle, 
-  CheckCircle2, Clock, ChevronRight, ArrowUpDown
+  CheckCircle2, Clock, ChevronRight, ChevronLeft, ArrowUpDown
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -35,6 +35,8 @@ export default function QueuePage() {
   const [selectedTier, setSelectedTier] = useState<string>("ALL");
   const [selectedRisk, setSelectedRisk] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 25;
 
   const loadInstruments = async () => {
     try {
@@ -47,6 +49,7 @@ export default function QueuePage() {
 
       const data = await fetchApi<InstrumentRow[]>(`/instruments?${params.toString()}`);
       setInstruments(data);
+      setPage(1);
     } catch (e) {
       console.error(e);
     } finally {
@@ -62,6 +65,9 @@ export default function QueuePage() {
     e.preventDefault();
     loadInstruments();
   };
+
+  const totalPages = Math.ceil(instruments.length / pageSize) || 1;
+  const displayedInstruments = instruments.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-5">
@@ -178,7 +184,7 @@ export default function QueuePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
-                {instruments.map((inst) => (
+                {displayedInstruments.map((inst) => (
                   <tr key={inst.id} className="hover:bg-zinc-800/40 transition">
                     <td className="py-3 px-4 font-medium text-white max-w-[280px]">
                       <div className="truncate">{inst.institution_name}</div>
@@ -252,6 +258,41 @@ export default function QueuePage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Snappy Pagination Controls */}
+        {!loading && instruments.length > pageSize && (
+          <div className="px-4 py-3 bg-zinc-950/80 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
+            <span className="font-mono text-[11px]">
+              Showing <span className="text-zinc-200">{(page - 1) * pageSize + 1}</span> to{" "}
+              <span className="text-zinc-200">{Math.min(page * pageSize, instruments.length)}</span> of{" "}
+              <span className="text-zinc-200 font-bold">{instruments.length}</span> instruments
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Prev</span>
+              </button>
+
+              <span className="px-2 py-0.5 font-mono text-[11px] text-zinc-300 bg-zinc-900 rounded border border-zinc-800">
+                Page {page} of {totalPages}
+              </span>
+
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>

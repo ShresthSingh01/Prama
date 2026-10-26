@@ -73,6 +73,7 @@ export default function AuditLedgerPage() {
       await loadAudit();
       // Re-verify immediately to trigger the alarm!
       await handleVerifyChain();
+      window.dispatchEvent(new Event("auditUpdated"));
     } catch (e) {
       console.error(e);
     } finally {

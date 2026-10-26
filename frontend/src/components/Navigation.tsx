@@ -24,17 +24,33 @@ export default function Navigation() {
     try {
       const data = await fetchApi<{ offset_days: number; simulated_date: string }>("/demo/status");
       setClockData(data);
-      const audit = await fetchApi<{ valid: boolean }>("/audit/verify");
-      setAuditValid(audit.valid);
     } catch (e) {
       // Backend may be starting
     }
   };
 
+  const refreshAudit = async () => {
+    try {
+      const audit = await fetchApi<{ valid: boolean }>("/audit/verify");
+      setAuditValid(audit.valid);
+    } catch (e) {}
+  };
+
   useEffect(() => {
     refreshClock();
-    const interval = setInterval(refreshClock, 8000);
-    return () => clearInterval(interval);
+    refreshAudit();
+    const interval = setInterval(refreshClock, 10000);
+    const handleUpdate = () => {
+      refreshClock();
+      refreshAudit();
+    };
+    window.addEventListener("clockUpdated", handleUpdate);
+    window.addEventListener("auditUpdated", handleUpdate);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("clockUpdated", handleUpdate);
+      window.removeEventListener("auditUpdated", handleUpdate);
+    };
   }, []);
 
   const handleAdvance = async (days: number) => {

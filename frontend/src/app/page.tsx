@@ -68,9 +68,11 @@ export default function CockpitPage() {
 
   const loadData = async () => {
     try {
-      const s = await fetchApi<SummaryData>("/dashboard/summary");
-      const t = await fetchApi<TimelinePoint[]>("/dashboard/timeline");
-      const q = await fetchApi<QueueItem[]>("/dashboard/queue?limit=6");
+      const [s, t, q] = await Promise.all([
+        fetchApi<SummaryData>("/dashboard/summary"),
+        fetchApi<TimelinePoint[]>("/dashboard/timeline"),
+        fetchApi<QueueItem[]>("/dashboard/queue?limit=6")
+      ]);
       setSummary(s);
       setTimeline(t);
       setUrgentQueue(q);

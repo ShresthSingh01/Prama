@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, ReleaseRequest, User, Flag,
@@ -53,7 +53,14 @@ def submit_release_request(
 
 @router.get("/release-requests")
 def list_release_requests(db: Session = Depends(get_db)):
-    requests = db.query(ReleaseRequest).order_by(ReleaseRequest.id.desc()).all()
+    requests = (
+        db.query(ReleaseRequest)
+        .options(
+            joinedload(ReleaseRequest.instrument).joinedload(Instrument.institution)
+        )
+        .order_by(ReleaseRequest.id.desc())
+        .all()
+    )
     out = []
     for r in requests:
         inst = r.instrument

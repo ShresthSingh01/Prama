@@ -3,7 +3,7 @@ import shutil
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, Institution, Bank, Document, FieldProvenance,
@@ -54,7 +54,11 @@ def list_instruments(
         )
         
     simulated_now = get_simulated_now(db)
-    results = query.order_by(Instrument.risk_score.desc(), Instrument.id.desc()).all()
+    results = query.options(
+        joinedload(Instrument.institution),
+        joinedload(Instrument.bank),
+        selectinload(Instrument.flags)
+    ).order_by(Instrument.risk_score.desc(), Instrument.id.desc()).all()
     
     items = []
     for inst in results:
@@ -88,7 +92,14 @@ def list_instruments(
 
 @router.get("/{id}")
 def get_instrument_detail(id: int, db: Session = Depends(get_db)):
-    inst = db.query(Instrument).filter(Instrument.id == id).first()
+    inst = db.query(Instrument).options(
+        joinedload(Instrument.institution),
+        joinedload(Instrument.bank),
+        selectinload(Instrument.provenance_fields),
+        selectinload(Instrument.documents),
+        selectinload(Instrument.flags),
+        selectinload(Instrument.verifications)
+    ).filter(Instrument.id == id).first()
     if not inst:
         raise HTTPException(status_code=404, detail="Instrument not found")
         

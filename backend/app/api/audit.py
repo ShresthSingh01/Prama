@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from backend.app.models.database import get_db
 from backend.app.models.entities import AuditLog
-from backend.app.services.audit_service import verify_audit_chain
+from backend.app.services.audit_service import verify_audit_chain, invalidate_audit_cache
 
 router = APIRouter(prefix="/audit", tags=["Cryptographic Audit Ledger"])
 
@@ -56,6 +56,7 @@ def simulate_database_tampering(entry_id: int, db: Session = Depends(get_db)):
         {"p": json.dumps(payload_dict), "id": entry_id}
     )
     db.commit()
+    invalidate_audit_cache()
     
     return {
         "success": True,

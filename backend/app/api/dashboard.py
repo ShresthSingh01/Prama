@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from collections import defaultdict
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
@@ -42,18 +42,19 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         .all()
     )
     
-    # Expiring Within 30 / 60 / 90 Days
-    all_instruments = db.query(Instrument).filter(
+    # Expiring Within 30 / 60 / 90 Days (query column only for minimal memory/DB overhead)
+    expiring_rows = db.query(Instrument.maturity_date).filter(
         Instrument.status.in_([InstrumentStatusEnum.ACTIVE.value, InstrumentStatusEnum.EXPIRING.value])
     ).all()
     
     expiring_30 = 0
     expiring_60 = 0
     expiring_90 = 0
-    for inst in all_instruments:
+    sim_date = simulated_now.date()
+    for (mat_str,) in expiring_rows:
         try:
-            mat = datetime.strptime(inst.maturity_date, "%Y-%m-%d")
-            diff = (mat.date() - simulated_now.date()).days
+            mat = datetime.strptime(mat_str, "%Y-%m-%d").date()
+            diff = (mat - sim_date).days
             if 0 <= diff <= 30:
                 expiring_30 += 1
             if 0 <= diff <= 60:
@@ -143,6 +144,11 @@ def get_act_today_queue(limit: int = 25, db: Session = Depends(get_db)):
     
     instruments = (
         db.query(Instrument)
+        .options(
+            joinedload(Instrument.institution),
+            joinedload(Instrument.bank),
+            selectinload(Instrument.flags)
+        )
         .filter(Instrument.status.notin_([InstrumentStatusEnum.RELEASED.value, InstrumentStatusEnum.RENEWED.value]))
         .order_by(Instrument.risk_score.desc())
         .limit(limit)

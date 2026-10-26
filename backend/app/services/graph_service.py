@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Set
 from collections import defaultdict
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from backend.app.models.entities import Instrument, Institution, Bank, Document
 
 def build_syndicate_graph(db: Session) -> Dict[str, Any]:
@@ -14,8 +14,12 @@ def build_syndicate_graph(db: Session) -> Dict[str, Any]:
     links = []
     node_set = set()
     
-    # 1. Fetch instruments with relationships
-    instruments = db.query(Instrument).all()
+    # 1. Fetch instruments with relationships eager-loaded (avoids 1800+ N+1 queries)
+    instruments = db.query(Instrument).options(
+        joinedload(Instrument.institution),
+        joinedload(Instrument.bank),
+        selectinload(Instrument.documents)
+    ).all()
     
     # Map institutions and banks
     fdr_to_insts = defaultdict(list)
