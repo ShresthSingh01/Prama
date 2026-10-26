@@ -7,6 +7,7 @@ from backend.app.models.entities import (
     FlagSeverityEnum, Document
 )
 from backend.app.core.crypto import hamming_distance
+from backend.app.services.knowledge import get_rule_parameter
 
 def evaluate_instrument_rules(db: Session, instrument: Instrument, ocr_data: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Evaluates validation rules R01-R09 and returns newly raised flags."""
@@ -31,12 +32,13 @@ def evaluate_instrument_rules(db: Session, instrument: Instrument, ocr_data: Opt
         expected_maturity = issue_dt + timedelta(days=instrument.tenure_days)
         actual_maturity = datetime.strptime(instrument.maturity_date, "%Y-%m-%d")
         diff_days = abs((actual_maturity - expected_maturity).days)
-        if diff_days > 2:
+        tolerance_days = int(get_rule_parameter("R02", "tolerance_days", default=2))
+        if diff_days > tolerance_days:
             new_flags.append({
                 "code": "R02_TENURE_MATURITY_MISMATCH",
                 "severity": FlagSeverityEnum.HIGH.value,
-                "explanation": f"Declared tenure ({instrument.tenure_days} days) does not match maturity date. Expected ~{expected_maturity.strftime('%Y-%m-%d')}, declared {instrument.maturity_date} (variance: {diff_days} days).",
-                "evidence": {"issue_date": instrument.issue_date, "tenure_days": instrument.tenure_days, "expected": expected_maturity.strftime('%Y-%m-%d'), "declared": instrument.maturity_date}
+                "explanation": f"Declared tenure ({instrument.tenure_days} days) does not match maturity date. Expected ~{expected_maturity.strftime('%Y-%m-%d')}, declared {instrument.maturity_date} (variance: {diff_days} days, tolerance: {tolerance_days} days).",
+                "evidence": {"issue_date": instrument.issue_date, "tenure_days": instrument.tenure_days, "expected": expected_maturity.strftime('%Y-%m-%d'), "declared": instrument.maturity_date, "tolerance_days": tolerance_days}
             })
     except Exception as e:
         new_flags.append({
@@ -46,22 +48,25 @@ def evaluate_instrument_rules(db: Session, instrument: Instrument, ocr_data: Opt
             "evidence": {"issue_date": instrument.issue_date, "maturity_date": instrument.maturity_date}
         })
         
-    # R03: Minimum security deposit requirement (AICTE handbook: standard minimum Rs 5,00,000)
-    if instrument.amount < 500000:
+    # R03: Minimum security deposit requirement (AICTE handbook parameter binding)
+    min_amount = float(get_rule_parameter("R03", "min_amount", default=500000.0))
+    if instrument.amount < min_amount:
         new_flags.append({
             "code": "R03_INSUFFICIENT_SECURITY_AMOUNT",
             "severity": FlagSeverityEnum.HIGH.value,
-            "explanation": f"Deposit amount of Rs {instrument.amount:,.2f} is below mandatory AICTE regulatory baseline (Rs 5,00,000).",
-            "evidence": {"amount": instrument.amount, "minimum_required": 500000}
+            "explanation": f"Deposit amount of Rs {instrument.amount:,.2f} is below mandatory AICTE regulatory baseline (Rs {min_amount:,.2f}).",
+            "evidence": {"amount": instrument.amount, "minimum_required": min_amount}
         })
 
-    # R04: Plausible interest rate band (3.0% to 9.5% per annum)
-    if instrument.interest_rate < 3.0 or instrument.interest_rate > 9.5:
+    # R04: Plausible interest rate band (from OKF rule parameters)
+    min_rate = float(get_rule_parameter("R04", "min_rate", default=3.0))
+    max_rate = float(get_rule_parameter("R04", "max_rate", default=9.5))
+    if instrument.interest_rate < min_rate or instrument.interest_rate > max_rate:
         new_flags.append({
             "code": "R04_IMPLAUSIBLE_INTEREST_RATE",
             "severity": FlagSeverityEnum.MEDIUM.value,
-            "explanation": f"Declared interest rate of {instrument.interest_rate}% is outside commercial bank regulatory bounds (3.0% - 9.5%).",
-            "evidence": {"interest_rate": instrument.interest_rate, "valid_range": "3.0% - 9.5%"}
+            "explanation": f"Declared interest rate of {instrument.interest_rate}% is outside commercial bank regulatory bounds ({min_rate}% - {max_rate}%).",
+            "evidence": {"interest_rate": instrument.interest_rate, "valid_range": f"{min_rate}% - {max_rate}%"}
         })
 
     # R05: Dates plausible (issue date not in distant future)

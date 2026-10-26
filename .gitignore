@@ -1,4 +1,6 @@
 # Python
+.env
+.env.local
 __pycache__/
 *.py[cod]
 *$py.class
@@ -27,3 +29,11 @@ uploads/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+coverage/
+*.log
+.eslintcache
+.cache/

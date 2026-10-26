@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Lock, CheckCircle2, XCircle, ShieldAlert, 
-  RotateCcw, Sparkles, AlertTriangle, ChevronRight, Hash
+  Sparkles, Hash, HelpCircle, ShieldCheck
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -71,7 +71,6 @@ export default function AuditLedgerPage() {
     try {
       await fetchApi<any>(`/audit/sabotage?entry_id=${selectedEntry.id}`, { method: "POST" });
       await loadAudit();
-      // Re-verify immediately to trigger the alarm!
       await handleVerifyChain();
       window.dispatchEvent(new Event("auditUpdated"));
     } catch (e) {
@@ -89,14 +88,14 @@ export default function AuditLedgerPage() {
   return (
     <div className="space-y-5">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200 dark:border-zinc-800">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-            <Lock className="w-5 h-5 text-emerald-400" />
-            Tamper-Evident SHA-256 Audit Ledger
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <Lock className="w-5 h-5 text-emerald-500" />
+            Tamper-Proof Audit Trail (Cryptographic Log)
           </h1>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Cryptographic hash-chained append-only log. Every regulatory decision is sealed by the previous block's SHA-256 hash.
+          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+            Every regulatory scrutiny action, clock change, and release order is cryptographically sealed in an append-only hash chain.
           </p>
         </div>
 
@@ -105,21 +104,21 @@ export default function AuditLedgerPage() {
           <button
             onClick={handleVerifyChain}
             disabled={verifying}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-md text-xs font-medium transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-600/20 dark:hover:bg-emerald-600/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 rounded-lg text-xs font-semibold transition shadow-sm"
           >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Verify Integrity ({total} Blocks)</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Verify Audit Integrity ({total} Blocks)</span>
           </button>
 
           {selectedEntry && (
             <button
               onClick={handleSimulateSabotage}
               disabled={sabotaging}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 rounded-md text-xs font-medium transition"
-              title="Simulates a rogue DBA tampering with this block via direct SQL injection"
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 dark:bg-rose-600/20 dark:hover:bg-rose-600/30 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 rounded-lg text-xs font-semibold transition shadow-sm"
+              title="Simulates an unauthorized backdoor change to prove the audit chain detects it"
             >
-              <ShieldAlert className="w-4 h-4" />
-              <span>Simulate Backdoor DB Sabotage</span>
+              <ShieldAlert className="w-4 h-4 text-rose-600" />
+              <span>Simulate DB Sabotage Test</span>
             </button>
           )}
         </div>
@@ -127,37 +126,37 @@ export default function AuditLedgerPage() {
 
       {/* Verification Status Banner */}
       {verifyResult && (
-        <div className={`p-4 rounded-lg border text-xs ${
+        <div className={`p-4 rounded-xl border text-xs shadow-sm ${
           verifyResult.valid 
-            ? "bg-emerald-950/20 border-emerald-500/40 text-emerald-300" 
-            : "bg-rose-950/40 border-rose-500/60 text-rose-300 shadow-2xl shadow-rose-950/60 animate-pulse"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-500/40 dark:text-emerald-300" 
+            : "bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/40 dark:border-rose-500/60 dark:text-rose-300 shadow-xl animate-pulse"
         }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-bold">
               {verifyResult.valid ? (
                 <>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <span>CRYPTOGRAPHIC CHAIN INTEGRITY: 100% UNTOUCHED</span>
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>AUDIT INTEGRITY: 100% UNTOUCHED & AUTHENTIC</span>
                 </>
               ) : (
                 <>
-                  <XCircle className="w-5 h-5 text-rose-500" />
-                  <span>CRITICAL ALARM: AUDIT CHAIN TAMPERING DETECTED!</span>
+                  <XCircle className="w-5 h-5 text-rose-600" />
+                  <span>SECURITY ALARM: UNAUTHORIZED AUDIT RECORD MODIFICATION DETECTED!</span>
                 </>
               )}
             </div>
-            <span className="font-mono text-[11px] text-zinc-400">
-              Validated {verifyResult.total_entries || total} Blocks
+            <span className="font-mono text-[11px] text-slate-500 dark:text-zinc-400">
+              Verified {verifyResult.total_entries || total} Chain Blocks
             </span>
           </div>
 
-          <p className="mt-1 text-xs text-zinc-300 font-mono">
+          <p className="mt-1 text-xs text-slate-700 dark:text-zinc-300 font-mono">
             {verifyResult.valid ? verifyResult.message : verifyResult.reason}
           </p>
 
           {!verifyResult.valid && verifyResult.broken_at_id && (
-            <div className="mt-2 p-2 bg-rose-900/30 border border-rose-500/40 rounded text-[11px] font-mono text-rose-200">
-              TAMPER LOCATED AT BLOCK ID: #{verifyResult.broken_at_id}. The SHA-256 seal failed to match the recomputed hash of its canonical payload.
+            <div className="mt-2 p-2.5 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-500/40 rounded-lg text-[11px] font-mono text-rose-900 dark:text-rose-200">
+              TAMPER LOCATED AT BLOCK ID: #{verifyResult.broken_at_id}. The stored SHA-256 seal failed to match the recomputed hash of its canonical data.
             </div>
           )}
         </div>
@@ -167,9 +166,9 @@ export default function AuditLedgerPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left 7 Cols: Block Chain List */}
-        <div className="lg:col-span-7 bg-zinc-900/70 border border-zinc-800 rounded-lg p-4 space-y-2">
-          <h3 className="text-xs font-semibold text-white uppercase tracking-wider mb-2">
-            Audit Ledger Blocks (Most Recent First)
+        <div className="lg:col-span-7 bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-3 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider mb-2">
+            Audit Records (Most Recent Actions First)
           </h3>
 
           <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
@@ -181,26 +180,26 @@ export default function AuditLedgerPage() {
                 <div
                   key={entry.id}
                   onClick={() => setSelectedEntry(entry)}
-                  className={`p-3 rounded border text-xs cursor-pointer transition ${
-                    isBroken ? "bg-rose-950/60 border-rose-500 text-white animate-bounce" :
-                    isSelected ? "bg-zinc-800 border-emerald-500 text-white" :
-                    "bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-900"
+                  className={`p-3.5 rounded-xl border text-xs cursor-pointer transition ${
+                    isBroken ? "bg-rose-100 border-rose-500 text-rose-900 dark:bg-rose-950/60 dark:text-white animate-bounce" :
+                    isSelected ? "bg-amber-50 border-amber-400 dark:bg-zinc-800 dark:border-emerald-500 text-slate-900 dark:text-white shadow-sm" :
+                    "bg-slate-50 border-slate-200 text-slate-700 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900"
                   }`}
                 >
                   <div className="flex items-center justify-between font-mono text-[10px] mb-1">
-                    <span className="text-emerald-400 font-bold">BLOCK #{entry.id}</span>
-                    <span className="text-zinc-500">{entry.ts}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 font-bold">BLOCK #{entry.id}</span>
+                    <span className="text-slate-500 dark:text-zinc-400">{entry.ts}</span>
                   </div>
 
-                  <div className="flex items-center gap-2 font-semibold text-zinc-100">
+                  <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-zinc-100">
                     <span>{entry.action}</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">({entry.entity_type} #{entry.entity_id})</span>
+                    <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono font-normal">({entry.entity_type} #{entry.entity_id})</span>
                   </div>
 
                   {/* Hash Chain Snippet */}
-                  <div className="mt-2 space-y-0.5 font-mono text-[10px] text-zinc-500">
-                    <div className="truncate">Prev: <span className="text-zinc-400">{entry.prev_hash}</span></div>
-                    <div className="truncate">Hash: <span className="text-amber-400/90">{entry.hash}</span></div>
+                  <div className="mt-2 space-y-0.5 font-mono text-[10px] text-slate-500 dark:text-zinc-500">
+                    <div className="truncate">Prev: <span className="text-slate-600 dark:text-zinc-400">{entry.prev_hash}</span></div>
+                    <div className="truncate">Hash: <span className="text-amber-700 dark:text-amber-400/90 font-semibold">{entry.hash}</span></div>
                   </div>
                 </div>
               );
@@ -208,17 +207,17 @@ export default function AuditLedgerPage() {
           </div>
         </div>
 
-        {/* Right 5 Cols: Block Detailed Canonical Inspector */}
+        {/* Right 5 Cols: Block Detailed Inspector */}
         <div className="lg:col-span-5 space-y-4">
           {selectedEntry ? (
-            <div className="bg-zinc-900/70 border border-zinc-800 rounded-lg p-5 space-y-4">
-              <div className="border-b border-zinc-800 pb-3">
-                <div className="flex items-center justify-between text-xs font-mono text-zinc-500">
-                  <span>BLOCK #{selectedEntry.id}</span>
+            <div className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-sm">
+              <div className="border-b border-slate-200 dark:border-zinc-800 pb-3">
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-zinc-400">
+                  <span className="font-semibold">BLOCK #{selectedEntry.id}</span>
                   <span>{selectedEntry.ts}</span>
                 </div>
-                <h2 className="text-base font-bold text-white mt-1">{selectedEntry.action}</h2>
-                <div className="text-xs text-zinc-400 font-mono">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white mt-1">{selectedEntry.action}</h2>
+                <div className="text-xs text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
                   Actor: User #{selectedEntry.actor_id || "SYSTEM"} ({selectedEntry.actor_role || "system"})
                 </div>
               </div>
@@ -226,15 +225,15 @@ export default function AuditLedgerPage() {
               {/* Hashes Detail */}
               <div className="space-y-2 text-xs font-mono">
                 <div>
-                  <div className="text-[10px] text-zinc-500 uppercase">Previous Block SHA-256</div>
-                  <div className="p-2 bg-zinc-950 border border-zinc-800 rounded text-zinc-300 text-[10px] break-all">
+                  <div className="text-[10px] text-slate-500 dark:text-zinc-400 uppercase font-semibold">Previous Block SHA-256</div>
+                  <div className="p-2 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg text-slate-700 dark:text-zinc-300 text-[10px] break-all">
                     {selectedEntry.prev_hash}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-[10px] text-amber-500 uppercase">Current Block SHA-256 Seal</div>
-                  <div className="p-2 bg-zinc-950 border border-amber-900/40 rounded text-amber-300 text-[10px] break-all">
+                  <div className="text-[10px] text-amber-700 dark:text-amber-400 uppercase font-semibold">Current Block Cryptographic Seal</div>
+                  <div className="p-2 bg-slate-50 dark:bg-zinc-950 border border-amber-300 dark:border-amber-900/40 rounded-lg text-amber-800 dark:text-amber-300 text-[10px] break-all font-bold">
                     {selectedEntry.hash}
                   </div>
                 </div>
@@ -242,24 +241,27 @@ export default function AuditLedgerPage() {
 
               {/* Canonical Payload Viewer */}
               <div>
-                <div className="text-[10px] text-zinc-400 uppercase font-mono mb-1">
-                  Canonical JSON Payload:
+                <div className="text-[10px] text-slate-500 dark:text-zinc-400 uppercase font-mono font-semibold mb-1">
+                  Recorded Event Details:
                 </div>
-                <pre className="p-3 bg-zinc-950 border border-zinc-800 rounded text-[11px] font-mono text-zinc-200 overflow-x-auto max-h-64">
+                <pre className="p-3 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg text-[11px] font-mono text-slate-800 dark:text-zinc-200 overflow-x-auto max-h-64">
                   {JSON.stringify(selectedEntry.payload, null, 2)}
                 </pre>
               </div>
 
-              <div className="p-3 bg-zinc-950 rounded border border-zinc-800 text-xs text-zinc-400 space-y-1">
-                <div className="font-semibold text-zinc-200 text-[11px]">Cryptographic Proof Formula:</div>
-                <div className="font-mono text-[10px] text-amber-400">
+              <div className="p-3 bg-slate-50 dark:bg-zinc-950 rounded-lg border border-slate-200 dark:border-zinc-800 text-xs text-slate-600 dark:text-zinc-400 space-y-1">
+                <div className="font-semibold text-slate-800 dark:text-zinc-200 text-[11px]">How the Tamper-Evident Seal Works:</div>
+                <div className="font-mono text-[10px] text-amber-700 dark:text-amber-400">
                   Hash = SHA256(prev_hash + CanonicalJSON(payload))
                 </div>
+                <p className="text-[10px] text-slate-500 dark:text-zinc-400">
+                  If any record is altered in the database, the cryptographic hash breaks immediately, sounding an alert.
+                </p>
               </div>
             </div>
           ) : (
-            <div className="p-12 text-center text-xs text-zinc-500 font-mono bg-zinc-900/60 border border-zinc-800 rounded-lg">
-              Select an audit block to inspect payload.
+            <div className="p-12 text-center text-xs text-slate-500 dark:text-zinc-400 bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-sm">
+              Select an audit block to inspect its details.
             </div>
           )}
         </div>

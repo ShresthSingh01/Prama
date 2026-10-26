@@ -2,7 +2,7 @@ import os
 import shutil
 from datetime import datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, status
 from sqlalchemy.orm import Session, joinedload, selectinload
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
@@ -304,9 +304,9 @@ async def upload_document(
     return {"success": True, "document_id": doc.id, "sha256": sha256}
 
 @router.post("/{id}/observations")
-def add_observation(
+async def add_observation(
     id: int,
-    text: str = Form(...),
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user)
 ):
@@ -314,11 +314,29 @@ def add_observation(
     if not inst:
         raise HTTPException(status_code=404, detail="Instrument not found")
         
+    text_val = ""
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            text_val = body.get("text", "")
+        except Exception:
+            text_val = ""
+    else:
+        try:
+            form = await request.form()
+            text_val = form.get("text", "")
+        except Exception:
+            text_val = ""
+            
+    if not text_val or not str(text_val).strip():
+        raise HTTPException(status_code=400, detail="Observation text cannot be empty")
+        
     author_id = current_user.id if current_user else 1
     obs = Observation(
         instrument_id=inst.id,
         author_id=author_id,
-        text=text
+        text=str(text_val).strip()
     )
     db.add(obs)
     db.commit()
@@ -326,6 +344,6 @@ def add_observation(
     log_audit_entry(db, "ADD_OBSERVATION", "observation", obs.id, {
         "instrument_id": inst.id,
         "author_id": author_id,
-        "text": text[:100]
+        "text": str(text_val).strip()[:100]
     })
     return {"success": True, "id": obs.id}

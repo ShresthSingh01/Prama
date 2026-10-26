@@ -122,7 +122,27 @@ def test_07_maker_checker_release_enforcement():
     """Maker cannot approve their own release request (maker_id != checker_id)."""
     db: Session = SessionLocal()
     try:
-        clean_inst = db.query(Instrument).filter(Instrument.status == "ACTIVE").first()
+        clean_inst = (
+            db.query(Instrument)
+            .filter(
+                Instrument.status != "RELEASED",
+                ~Instrument.flags.any(Flag.status == "open")
+            )
+            .first()
+        )
+        if not clean_inst:
+            inst_payload = {
+                "institution_id": 1,
+                "bank_id": 1,
+                "fdr_number": "TEST/RELEASE/CLEAN-01",
+                "amount": 500000.0,
+                "issue_date": "2024-01-01",
+                "maturity_date": "2026-01-01",
+                "tenure_days": 730,
+                "interest_rate": 7.0
+            }
+            create_res = client.post("/api/v1/instruments", json=inst_payload)
+            clean_inst = db.query(Instrument).filter(Instrument.id == create_res.json()["id"]).first()
         
         # 1. Submit release request
         rel_res = client.post(f"/api/v1/instruments/{clean_inst.id}/release-requests", json={"reason": "Tenure completed"})

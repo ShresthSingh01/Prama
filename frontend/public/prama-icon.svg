@@ -1,0 +1,32 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pubIconBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#1E1B4B" />
+      <stop offset="50%" stopColor="#0F172A" />
+      <stop offset="100%" stopColor="#090D16" />
+    </linearGradient>
+    <linearGradient id="pubIconStem" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#6366F1" />
+      <stop offset="100%" stopColor="#4338CA" />
+    </linearGradient>
+    <linearGradient id="pubIconLoop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#818CF8" />
+      <stop offset="60%" stopColor="#6366F1" />
+      <stop offset="100%" stopColor="#4F46E5" />
+    </linearGradient>
+    <linearGradient id="pubIconStar" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#FDE047" />
+      <stop offset="50%" stopColor="#F59E0B" />
+      <stop offset="100%" stopColor="#D97706" />
+    </linearGradient>
+    <linearGradient id="pubIconBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#818CF8" stopOpacity="0.6" />
+      <stop offset="100%" stopColor="#312E81" stopOpacity="0.3" />
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="38" height="38" rx="9" fill="url(#pubIconBg)" stroke="url(#pubIconBorder)" stroke-width="1.5"/>
+  <rect x="9.5" y="8.5" width="5" height="23" rx="2.5" fill="url(#pubIconStem)"/>
+  <path d="M 13.5 8.5 H 23.5 C 27.64 8.5 31 11.86 31 16 C 31 20.14 27.64 23.5 23.5 23.5 H 13.5 V 18.5 H 23 C 24.38 18.5 25.5 17.38 25.5 16 C 25.5 14.62 24.38 13.5 23 13.5 H 13.5 Z" fill="url(#pubIconLoop)"/>
+  <path d="M 21.5 13.2 Q 21.5 16 24.2 16 Q 21.5 16 21.5 18.8 Q 21.5 16 18.8 16 Q 21.5 16 21.5 13.2 Z" fill="url(#pubIconStar)"/>
+  <circle cx="28.5" cy="28.5" r="1.5" fill="#10B981" />
+</svg>

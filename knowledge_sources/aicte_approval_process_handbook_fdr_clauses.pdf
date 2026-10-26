@@ -1,0 +1,262 @@
+%PDF-1.4
+1 0 obj
+<</Type /Catalog /Pages 2 0 R>>
+endobj
+2 0 obj
+<</Type /Pages /Kids [3 0 R 4 0 R 5 0 R 6 0 R 7 0 R 8 0 R] /Count 6>>
+endobj
+3 0 obj
+<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 9 0 R>>>> /Contents 10 0 R>>
+endobj
+4 0 obj
+<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 9 0 R>>>> /Contents 11 0 R>>
+endobj
+5 0 obj
+<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 9 0 R>>>> /Contents 12 0 R>>
+endobj
+6 0 obj
+<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 9 0 R>>>> /Contents 13 0 R>>
+endobj
+7 0 obj
+<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 9 0 R>>>> /Contents 14 0 R>>
+endobj
+8 0 obj
+<</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <</Font <</F1 9 0 R>>>> /Contents 15 0 R>>
+endobj
+9 0 obj
+<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>
+endobj
+10 0 obj
+<</Length 1300>> stream
+BT
+/F1 12 Tf
+50 740 Td
+(AICTE Approval Process Handbook - Page 1) Tj
+0 -25 Td
+/F1 14 Tf
+(Chapter 1: General Norms & Statutory Joint Deposit Requirement) Tj
+0 -30 Td
+/F1 10 Tf
+(Clause 1.4: Mandatory Security Deposit Pledged as Joint FDR) Tj
+0 -15 Td
+(Every Technical Institution applying for Establishment or Extension of Approval) Tj
+0 -12 Td
+(shall maintain a mandatory Security Deposit in the form of a Fixed Deposit Receipt) Tj
+0 -12 Td
+((FDR) drawn on a Scheduled Commercial Bank. The FDR must be created jointly in) Tj
+0 -12 Td
+(the name of the Institution's sponsoring Society or Trust and the Regional Officer,) Tj
+0 -12 Td
+(All India Council for Technical Education (AICTE). No unencumbered standalone) Tj
+0 -12 Td
+(deposits shall be accepted. The physical receipt or authenticated electronic) Tj
+0 -12 Td
+(certificate shall be deposited with AICTE.) Tj
+0 -20 Td
+(Clause 1.5: Non-Transferability and Encumbrance Restriction) Tj
+0 -15 Td
+(Under no circumstances shall the pledged Security Deposit FDR be mortgaged, pledged) Tj
+0 -12 Td
+(to third parties, or utilized as collateral for loans or credit facilities. Any) Tj
+0 -12 Td
+(lien created on the security deposit without express written sanction of the) Tj
+0 -12 Td
+(Council shall lead to immediate withdrawal of approval.) Tj
+0 -20 Td
+ET
+endstream
+endobj
+11 0 obj
+<</Length 1255>> stream
+BT
+/F1 12 Tf
+50 740 Td
+(AICTE Approval Process Handbook - Page 2) Tj
+0 -25 Td
+/F1 14 Tf
+(Chapter 2: Minimum Security Deposit Baseline Schedules) Tj
+0 -30 Td
+/F1 10 Tf
+(Clause 2.8: Statutory Minimum Deposit Amounts by Program) Tj
+0 -15 Td
+(The baseline security deposit amount for starting a technical institution is) Tj
+0 -12 Td
+(structured as follows: 1. Engineering and Technology (Under Graduate): Rupees) Tj
+0 -12 Td
+(35,00,000 (Thirty-Five Lakhs). 2. Pharmacy / Applied Arts and Crafts: Rupees) Tj
+0 -12 Td
+(25,00,000 (Twenty-Five Lakhs). 3. Management (MBA) / Computer Applications (MCA):) Tj
+0 -12 Td
+(Rupees 15,00,000 (Fifteen Lakhs). 4. Diploma Level Technical Programs: Rupees) Tj
+0 -12 Td
+(15,00,000 (Fifteen Lakhs). No security deposit shall be accepted below Rupees) Tj
+0 -12 Td
+(5,00,000 (Five Lakhs) under any relaxed category.) Tj
+0 -20 Td
+(Clause 2.9: Tenure of Security Deposit) Tj
+0 -15 Td
+(The mandatory tenure of the Security Deposit FDR shall be 10 (ten) continuous) Tj
+0 -12 Td
+(years for newly established institutions, or 8 (eight) continuous years for stand-alone) Tj
+0 -12 Td
+(programs. The institution is obliged to maintain the instrument active throughout) Tj
+0 -12 Td
+(the tenure with auto-renewal covenants.) Tj
+0 -20 Td
+ET
+endstream
+endobj
+12 0 obj
+<</Length 1129>> stream
+BT
+/F1 12 Tf
+50 740 Td
+(AICTE Approval Process Handbook - Page 3) Tj
+0 -25 Td
+/F1 14 Tf
+(Chapter 3: Bank Authentication, Signed QR and Verification Protocol) Tj
+0 -30 Td
+/F1 10 Tf
+(Clause 3.12: Cryptographic Bank Authentication & Signed QR Standards) Tj
+0 -15 Td
+(All partner banks issuing FDR certificates shall embed a machine-readable Ed25519) Tj
+0 -12 Td
+(digitally signed QR code. The payload must contain the FDR serial, issuing branch) Tj
+0 -12 Td
+(IFSC, principal amount, maturity date, and digital signature. Where physical) Tj
+0 -12 Td
+(legacy FDRs lack digital signatures, verification shall be obtained through tokenized) Tj
+0 -12 Td
+(verify-link mechanisms sent to the bank's designated nodal officer. AICTE officers) Tj
+0 -12 Td
+(must verify trust tiers.) Tj
+0 -20 Td
+(Clause 3.13: Discrepancy Reconciliation) Tj
+0 -15 Td
+(Any variance between the amount declared by the institution and the amount confirmed) Tj
+0 -12 Td
+(by the issuing bank shall trigger an automated high-severity discrepancy flag.) Tj
+0 -12 Td
+(The institution shall have 15 days to rectify or provide bank-authenticated addenda.) Tj
+0 -12 Td
+ET
+endstream
+endobj
+13 0 obj
+<</Length 858>> stream
+BT
+/F1 12 Tf
+50 740 Td
+(AICTE Approval Process Handbook - Page 4) Tj
+0 -25 Td
+/F1 14 Tf
+(Chapter 5: Maturity Monitoring, Renewal Escalation & Reminder Ladder) Tj
+0 -30 Td
+/F1 10 Tf
+(Clause 5.4: Escalation Ladder Prior to Maturity) Tj
+0 -15 Td
+(To prevent lapse of statutory security cover, the automated system shall issue) Tj
+0 -12 Td
+(formal notices: - 60 days before maturity: First advisory to Institution Management.) Tj
+0 -12 Td
+(- 30 days before maturity: Second statutory reminder requiring renewal submission.) Tj
+0 -12 Td
+(- 15 days before maturity: Escalation to Scrutiny Officer; institution marked) Tj
+0 -12 Td
+(as EXPIRING. - 7 days before maturity: Critical notice to Regional Officer. Failure) Tj
+0 -12 Td
+(to renew within 15 days post-maturity shall result in status OVERDUE and suspension) Tj
+0 -12 Td
+(of portal processing.) Tj
+0 -20 Td
+ET
+endstream
+endobj
+14 0 obj
+<</Length 1225>> stream
+BT
+/F1 12 Tf
+50 740 Td
+(AICTE Approval Process Handbook - Page 5) Tj
+0 -25 Td
+/F1 14 Tf
+(Chapter 6: Release, Refund & Preconditions for Security Deposit) Tj
+0 -30 Td
+/F1 10 Tf
+(Clause 6.5: Statutory Preconditions for Deposit Release) Tj
+0 -15 Td
+(Security deposits shall be refunded or released only upon fulfillment of all) Tj
+0 -12 Td
+(statutory preconditions: 1. Completion of full stipulated tenure (minimum 8 or) Tj
+0 -12 Td
+(10 years without interruption). 2. At least two cohorts of students must have) Tj
+0 -12 Td
+(graduated successfully without unresolved grievances. 3. Zero open compliance) Tj
+0 -12 Td
+(flags, vigilance inquiries, or pending court cases involving financial malfeasance.) Tj
+0 -12 Td
+(4. Dual authorization: Scrutiny Officer (Maker) verifies eligibility checklist,) Tj
+0 -12 Td
+(followed by independent approval by Senior Officer / Regional Director (Checker).) Tj
+0 -12 Td
+(Clause 6.6: Refund Certificate & Settlement Voucher) Tj
+0 -15 Td
+(Upon approval, an official release order with SHA-256 cryptographic verification) Tj
+0 -12 Td
+(token is issued to the bank. The bank shall remit the deposit amount and accrued) Tj
+0 -12 Td
+(interest directly to the registered trust account.) Tj
+0 -20 Td
+ET
+endstream
+endobj
+15 0 obj
+<</Length 832>> stream
+BT
+/F1 12 Tf
+50 740 Td
+(AICTE Approval Process Handbook - Page 6) Tj
+0 -25 Td
+/F1 14 Tf
+(Chapter 8: Penal Actions for Fraudulent FDRs, Collusion Rings & Forgery) Tj
+0 -30 Td
+/F1 10 Tf
+(Clause 8.2: Cross-Institution Duplicate Serial and Collusion Rings) Tj
+0 -15 Td
+(Submission of an FDR serial number, document hash, or deposit certificate already) Tj
+0 -12 Td
+(pledged by another institution constitutes gross regulatory fraud and syndicated) Tj
+0 -12 Td
+(collusion. AICTE shall immediately: 1. Issue immediate show-cause notice and) Tj
+0 -12 Td
+(freeze admission approval. 2. File First Information Report (FIR) under relevant) Tj
+0 -12 Td
+(sections of Bharatiya Nyaya Sanhita (BNS) / IPC for forgery. 3. Blacklist trustees) Tj
+0 -12 Td
+(and refer issuing branch officers to RBI and Indian Banks Association (IBA).) Tj
+0 -12 Td
+ET
+endstream
+endobj
+xref
+0 16
+0000000000 65535 f 
+0000000009 00000 n 
+0000000056 00000 n 
+0000000141 00000 n 
+0000000262 00000 n 
+0000000383 00000 n 
+0000000504 00000 n 
+0000000625 00000 n 
+0000000746 00000 n 
+0000000867 00000 n 
+0000000935 00000 n 
+0000002286 00000 n 
+0000003592 00000 n 
+0000004772 00000 n 
+0000005680 00000 n 
+0000006956 00000 n 
+trailer <</Size 16 /Root 1 0 R>>
+startxref
+7838
+%%EOF

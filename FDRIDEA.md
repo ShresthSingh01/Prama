@@ -72,6 +72,23 @@ Optionally, a **survival-analysis model (Cox PH)** estimates each institution's 
 ### Innovation 5 – Hash-chained, tamper-evident audit trail
 Every action (submission, verification, edit, approval, release) is appended with the hash of the previous entry. Any tampering breaks the chain, and a one-click **"Verify Integrity"** proves the record is untouched. Release certificates carry a QR linking to their audit hash.
 
+### Innovation 6 – OKF (Open Knowledge Format) Dynamic Policy Bundle
+Codifies AICTE regulations, automated rules (R01-R09), bank format standards, and release preconditions as human-editable, Git-versioned Markdown. Non-critical thresholds (tolerance days, minimum deposits, interest rate bounds) bind dynamically to the rules engine, allowing instant policy updates with hot-reload audit tracking.
+
+### Innovation 7 – PageIndex Hierarchical Compliance Copilot
+Unlike standard chunked vector RAG that loses legal context, PageIndex parses long AICTE Approval Process Handbooks into an indexed document tree (Document -> Chapter -> Section -> Clause). Answers officer questions with exact section and page citations verified against retrieved passages.
+
+### Innovation 8 – Guarded Multi-Provider LLM/SLM Intelligence
+Hybrid engine pairing Online Google Gemini API with local SLM (Ollama) fallback:
+- **Task A (Extraction):** Mandatory substring hallucination guard eliminates invented values.
+- **Task B (Flag Explanations):** Plain English and Hindi explanations with numeric/date fidelity guards.
+- **Task C (Reminders):** Hindi drafts verifying FDR serials and amounts remain unaltered.
+- **Task D (NL Search):** Converts natural language into strict Pydantic filter objects (never SQL).
+- **Decision Isolation:** LLM/SLM outputs never decide trust tiers, verification status, or approvals.
+
+### Innovation 9 – High-DPI Interactive Vector Visual Graphs (@xyflow/react)
+Replaces blurry canvas simulations with modern React Flow vector graphics for both Syndicate Collusion Rings and OKF Knowledge Concept Graphs, featuring hardware-accelerated pan/zoom, custom styled nodes, glowing collusion highlights, and inspection drawers.
+
 ### Additional capabilities
 - Fraud-ring graph analytics linking institutions, banks/branches and document hashes to expose coordinated misuse.
 - Maker-checker-approver release workflow with precondition checks.

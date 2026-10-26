@@ -161,6 +161,9 @@ class OcrResult(Base):
     fields = Column(JSON, nullable=True)
     boxes = Column(JSON, nullable=True)
     engine = Column(String(50), default="PyMuPDF+Regex")
+    slm_fields = Column(JSON, nullable=True)
+    slm_model = Column(String(100), nullable=True)
+    slm_latency_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     document = relationship("Document", back_populates="ocr_result")
@@ -173,6 +176,8 @@ class Flag(Base):
     code = Column(String(50), nullable=False)
     severity = Column(String(20), default=FlagSeverityEnum.MEDIUM.value)
     explanation = Column(Text, nullable=False)
+    explanation_text = Column(Text, nullable=True)
+    explanation_text_hi = Column(Text, nullable=True)
     evidence = Column(JSON, nullable=True)
     status = Column(String(20), default="open")  # open, resolved, dismissed
     raised_by = Column(String(50), default="system")
@@ -289,4 +294,36 @@ class EvalRun(Base):
     precision = Column(Float, default=0.0)
     recall = Column(Float, default=0.0)
     f1 = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class DocIndexCache(Base):
+    __tablename__ = "doc_index_cache"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    doc_title = Column(String(255), nullable=False)
+    file_sha256 = Column(String(64), nullable=False, index=True)
+    doc_id = Column(String(100), nullable=False, index=True)
+    tree = Column(JSON, nullable=False)
+    built_with = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class CopilotQuery(Base):
+    __tablename__ = "copilot_queries"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=True)
+    instrument_id = Column(Integer, nullable=True)
+    question = Column(Text, nullable=False)
+    cited = Column(JSON, nullable=True)
+    answer = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class EvalSlmRun(Base):
+    __tablename__ = "eval_slm_runs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    model = Column(String(100), nullable=False)
+    provider = Column(String(50), default="gemini")
+    task = Column(String(100), nullable=False)
+    metrics = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

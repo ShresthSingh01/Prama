@@ -1,0 +1,20 @@
+{
+  "title": "AICTE Approval Process Handbook (FDR & Security Deposit Clauses)",
+  "version": "2024-2027",
+  "publisher": "All India Council for Technical Education, New Delhi",
+  "documents": [
+    {
+      "id": "AICTE-APH-FDR-2026",
+      "filename": "aicte_approval_process_handbook_fdr_clauses.pdf",
+      "total_pages": 6,
+      "chapters": [
+        "Chapter 1: General Norms & Statutory Joint Deposit Requirement",
+        "Chapter 2: Minimum Security Deposit Baseline Schedules",
+        "Chapter 3: Bank Authentication, Signed QR and Verification Protocol",
+        "Chapter 5: Maturity Monitoring, Renewal Escalation & Reminder Ladder",
+        "Chapter 6: Release, Refund & Preconditions for Security Deposit",
+        "Chapter 8: Penal Actions for Fraudulent FDRs, Collusion Rings & Forgery"
+      ]
+    }
+  ]
+}

@@ -278,8 +278,31 @@ GET  /evaluation/latest     POST /evaluation/run
 - README explains architecture, mocks vs real, how to run the demo, and limitations honestly.
 - Demo can be repeated from scratch using `make demo-reset`.
 
-## 17. Assumptions and honest limitations (put in README and pitch)
+## 18. Add-on Architecture: Gemini/SLM + PageIndex Compliance Copilot + OKF Bundle
 
-- Real banks lack a common verification API; signed-QR and verify-link are proposed mechanisms demonstrated with a mock bank.
-- AICTE system integration is represented by a mock service with a documented interface.
-- Forgery metrics are on a synthetic dataset; real-world accuracy needs real samples.
+Incorporated as an additive, non-breaking upgrade to the core platform:
+1. **Hybrid LLM/SLM Engine (`LLMClient`)**:
+   - Google Gemini REST API (`gemini-2.0-flash`) as primary online provider.
+   - Ollama Local SLM (`http://localhost:11434`) as on-prem fallback.
+   - Deterministic `NullClient` guaranteeing zero crash fallback when offline.
+2. **Guarded Regulatory Operations**:
+   - Task A: OCR structured field extraction with mandatory substring hallucination guard.
+   - Task B: Plain English & Hindi flag explanations with numeric/date fidelity guards.
+   - Task C: Hindi reminder drafts with variable invariance verification.
+   - Task D: Natural language search translating questions to validated Pydantic filter objects.
+   - **Decision Isolation**: LLM/SLM outputs never determine verification, trust tiers, or approvals.
+3. **OKF (Open Knowledge Format v0.1) Bundle (`knowledge/`)**:
+   - Human-editable, Git-versioned Markdown codifying rules (R01-R09), banks, policies, and lifecycle.
+   - Dynamic parameter binding (`tolerance_days`, `min_amount`, `interest_bounds`) into `rules_engine.py`.
+   - In-memory link graph generation and hot-reload (`POST /knowledge/reload`) audited to hash chain.
+4. **PageIndex Compliance Copilot (`/copilot/ask`)**:
+   - Hierarchical tree retrieval over genuine AICTE Approval Process Handbook regulations.
+   - Generates section- and page-cited answers verified against retrieved passages.
+   - Refusal mechanism for out-of-scope inquiries without fabricated citations.
+5. **Interactive Vector Graphs (`@xyflow/react`)**:
+   - High-DPI React Flow vector graphs for Syndicate Collusion Rings (`/graph`) and OKF Concepts (`/knowledge`).
+   - Glowing collusion edge animations, minimap, custom styled cards, and flyout inspection drawers.
+6. **Empirical Benchmarking (`/evaluation`)**:
+   - Forensic Tamper Detection (N=200 Bank-Signed vs Tampered).
+   - SLM Field Extraction Benchmark (Regex vs SLM Accuracy, Null-rate, Latency).
+   - Copilot Citation Benchmark (20 Handbook Questions + 5 Refusal Queries).

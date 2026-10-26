@@ -1,0 +1,181 @@
+{
+  "benchmark_name": "AICTE Approval Process Handbook (FDR & Security Deposit) Benchmark",
+  "version": "1.0.0",
+  "questions": [
+    {
+      "id": "Q01",
+      "question": "What is the mandatory security deposit amount for starting an Under Graduate Engineering and Technology institution?",
+      "expected_section": "Clause 2.8: Statutory Minimum Deposit Amounts by Program",
+      "expected_page": 2,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q02",
+      "question": "What is the minimum security deposit required for a Pharmacy institution under AICTE regulations?",
+      "expected_section": "Clause 2.8: Statutory Minimum Deposit Amounts by Program",
+      "expected_page": 2,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q03",
+      "question": "What is the statutory minimum deposit amount for starting an MBA or MCA program?",
+      "expected_section": "Clause 2.8: Statutory Minimum Deposit Amounts by Program",
+      "expected_page": 2,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q04",
+      "question": "What is the minimum statutory floor for any technical program deposit under AICTE handbook?",
+      "expected_section": "Clause 2.8: Statutory Minimum Deposit Amounts by Program",
+      "expected_page": 2,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q05",
+      "question": "In whose name must the security deposit FDR be pledged according to Clause 1.4?",
+      "expected_section": "Clause 1.4: Mandatory Security Deposit Pledged as Joint FDR",
+      "expected_page": 1,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q06",
+      "question": "Can an institution create a lien or mortgage on the security deposit FDR?",
+      "expected_section": "Clause 1.5: Non-Transferability and Encumbrance Restriction",
+      "expected_page": 1,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q07",
+      "question": "What is the mandatory tenure of the security deposit for newly established institutions?",
+      "expected_section": "Clause 2.9: Tenure of Security Deposit",
+      "expected_page": 2,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q08",
+      "question": "What digital signature standard must partner banks embed in FDR certificates?",
+      "expected_section": "Clause 3.12: Cryptographic Bank Authentication & Signed QR Standards",
+      "expected_page": 3,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q09",
+      "question": "How are physical legacy FDRs without digital signatures verified with banks?",
+      "expected_section": "Clause 3.12: Cryptographic Bank Authentication & Signed QR Standards",
+      "expected_page": 3,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q10",
+      "question": "What happens if there is an amount variance between institution declaration and bank confirmation?",
+      "expected_section": "Clause 3.13: Discrepancy Reconciliation",
+      "expected_page": 3,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q11",
+      "question": "When is the first automated advisory notice sent to the institution before maturity?",
+      "expected_section": "Clause 5.4: Escalation Ladder Prior to Maturity",
+      "expected_page": 4,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q12",
+      "question": "What notification is issued 30 days prior to FDR maturity?",
+      "expected_section": "Clause 5.4: Escalation Ladder Prior to Maturity",
+      "expected_page": 4,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q13",
+      "question": "At what stage before maturity is an instrument escalated to the Scrutiny Officer and marked as EXPIRING?",
+      "expected_section": "Clause 5.4: Escalation Ladder Prior to Maturity",
+      "expected_page": 4,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q14",
+      "question": "Who receives the critical notice 7 days prior to FDR maturity?",
+      "expected_section": "Clause 5.4: Escalation Ladder Prior to Maturity",
+      "expected_page": 4,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q15",
+      "question": "What happens if an FDR is not renewed within 15 days following its maturity date?",
+      "expected_section": "Clause 5.4: Escalation Ladder Prior to Maturity",
+      "expected_page": 4,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q16",
+      "question": "What are the statutory preconditions that must be satisfied before security deposit release?",
+      "expected_section": "Clause 6.5: Statutory Preconditions for Deposit Release",
+      "expected_page": 5,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q17",
+      "question": "How many student cohorts must graduate successfully before deposit release can be approved?",
+      "expected_section": "Clause 6.5: Statutory Preconditions for Deposit Release",
+      "expected_page": 5,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q18",
+      "question": "What Maker-Checker roles are required for authorizing deposit release?",
+      "expected_section": "Clause 6.5: Statutory Preconditions for Deposit Release",
+      "expected_page": 5,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q19",
+      "question": "What penal consequences are enforced if an identical FDR serial number is pledged by two institutions?",
+      "expected_section": "Clause 8.2: Cross-Institution Duplicate Serial and Collusion Rings",
+      "expected_page": 6,
+      "out_of_scope": false
+    },
+    {
+      "id": "Q20",
+      "question": "What criminal actions are initiated under Bharatiya Nyaya Sanhita (BNS) for forged FDR certificates?",
+      "expected_section": "Clause 8.2: Cross-Institution Duplicate Serial and Collusion Rings",
+      "expected_page": 6,
+      "out_of_scope": false
+    },
+    {
+      "id": "REF01",
+      "question": "What is the capital city of France?",
+      "expected_section": "NONE",
+      "expected_page": 0,
+      "out_of_scope": true
+    },
+    {
+      "id": "REF02",
+      "question": "Can institutions use Bitcoin or cryptocurrency as security deposits?",
+      "expected_section": "NONE",
+      "expected_page": 0,
+      "out_of_scope": true
+    },
+    {
+      "id": "REF03",
+      "question": "How do you cook paneer butter masala?",
+      "expected_section": "NONE",
+      "expected_page": 0,
+      "out_of_scope": true
+    },
+    {
+      "id": "REF04",
+      "question": "What are the rules for football offside in Premier League?",
+      "expected_section": "NONE",
+      "expected_page": 0,
+      "out_of_scope": true
+    },
+    {
+      "id": "REF05",
+      "question": "Who won the cricket world cup in 1983?",
+      "expected_section": "NONE",
+      "expected_page": 0,
+      "out_of_scope": true
+    }
+  ]
+}
