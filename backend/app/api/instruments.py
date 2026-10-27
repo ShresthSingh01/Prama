@@ -16,7 +16,10 @@ from backend.app.services.clock_service import get_simulated_now
 from backend.app.services.audit_service import log_audit_entry
 from backend.app.services.rules_engine import evaluate_instrument_rules
 from backend.app.services.risk_service import compute_instrument_risk_score
-from backend.app.services.forensic_service import perform_error_level_analysis, inspect_pdf_metadata, extract_document_fields
+from backend.app.services.forensic_service import (
+    perform_error_level_analysis, inspect_pdf_metadata, extract_document_fields,
+    get_instrument_forensics
+)
 from backend.app.schemas.api_schemas import InstrumentCreate
 from backend.app.api.auth import get_optional_user, get_current_user
 
@@ -179,6 +182,26 @@ def get_instrument_detail(id: int, db: Session = Depends(get_db)):
             } for o in inst.observations
         ]
     }
+
+@router.get("/{id}/forensics")
+def get_forensic_details(
+    id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns full visual forensic artifacts:
+    - Scanned bank certificate document preview URL
+    - Error Level Analysis (ELA) compression variance heatmap URL
+    - Bank cryptographic QR payload and URL
+    - Interactive OCR bounding boxes with confidence scores
+    - Tamper and splicing anomaly detection results
+    """
+    try:
+        return get_instrument_forensics(db, id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate forensic report: {str(e)}")
 
 @router.post("")
 def create_instrument(

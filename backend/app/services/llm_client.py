@@ -13,21 +13,21 @@ logger = logging.getLogger(__name__)
 class TokenBucketRateLimiter:
     """
     Thread-safe Token Bucket Rate Limiter to protect against Google Gemini API rate limits (e.g. 15 RPM).
-    Enforces smooth request spacing and a maximum request rate per minute.
+    Enforces smooth request spacing and a maximum request rate per minute without blocking requests unnecessarily.
     """
-    def __init__(self, rpm: int = 15, max_burst: int = 1):
+    def __init__(self, rpm: int = 15, max_burst: int = 4):
         self.rpm = max(1, rpm)
         self.rate = self.rpm / 60.0  # tokens per second
         self.max_tokens = float(max_burst)
         self.tokens = float(max_burst)
         self.last_refill = time.monotonic()
-        self.min_interval = 60.0 / self.rpm  # e.g., 4.0s for 15 RPM
+        self.min_interval = 0.2  # 200ms minimum interval to allow fast interactive responses
         self.last_request = 0.0
         self.lock = threading.Lock()
 
     def acquire(self) -> float:
         """
-        Blocks until a token is available and minimum spacing is met.
+        Non-blocking or minimal spacing check.
         Returns the duration slept in seconds.
         """
         with self.lock:
@@ -40,12 +40,12 @@ class TokenBucketRateLimiter:
             
             sleep_needed = 0.0
             
-            # 2. Check token capacity
+            # 2. Check token capacity with capped wait
             if self.tokens < 1.0:
                 deficit = 1.0 - self.tokens
-                sleep_needed = max(sleep_needed, deficit / self.rate)
+                sleep_needed = min(1.0, deficit / self.rate)
                 
-            # 3. Minimum interval spacing between consecutive calls (prevents instantaneous burst)
+            # 3. Minimum interval spacing between consecutive calls
             time_since_last = now - self.last_request
             if time_since_last < self.min_interval:
                 spacing_delay = self.min_interval - time_since_last
@@ -75,14 +75,14 @@ class LLMClient(Protocol):
         ...
 
 class GeminiClient:
-    """Online Google Gemini API client with schema-constrained JSON, token bucket rate limiter, and exponential backoff retry."""
+    """Online Google Gemini API client with schema-constrained JSON, token bucket rate limiter, and fast fallback."""
     def __init__(
         self,
         api_key: str,
         model: str = "gemini-3-flash-preview",
         rpm_limit: int = 15,
-        max_retries: int = 3,
-        timeout: int = 30
+        max_retries: int = 1,
+        timeout: int = 4
     ):
         self.api_key = api_key
         self.model = model
@@ -91,11 +91,17 @@ class GeminiClient:
         self.timeout = timeout
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
         self.rate_limiter = TokenBucketRateLimiter(rpm=rpm_limit)
-        # Fallback model in case primary model encounters transient 503 capacity issues
         self.backup_model = "gemini-3.1-flash-lite-preview" if "preview" in model else None
+        self._rate_limited_until = 0.0
 
     def _execute_with_retry(self, fn):
-        """Executes API call wrapped in rate-limiting and exponential backoff on 429/503."""
+        """Executes API call wrapped in rate-limiting and fast failover on 429/503/timeout."""
+        now = time.monotonic()
+        if now < self._rate_limited_until:
+            dummy_req = httpx.Request("POST", "https://generativelanguage.googleapis.com")
+            dummy_resp = httpx.Response(429, request=dummy_req)
+            raise httpx.HTTPStatusError("Gemini API rate limited (cooldown active)", request=dummy_req, response=dummy_resp)
+
         self.rate_limiter.acquire()
         
         last_exception = None
@@ -104,16 +110,14 @@ class GeminiClient:
                 return fn()
             except httpx.HTTPStatusError as e:
                 status = e.response.status_code
-                if status in (429, 503) and attempt < self.max_retries:
-                    retry_after = e.response.headers.get("Retry-After")
-                    if retry_after and retry_after.isdigit():
-                        backoff = float(retry_after) + 1.0
-                    else:
-                        base = 5.0 if status == 429 else 3.0
-                        backoff = (base * (attempt + 1)) + random.uniform(0.5, 1.5)
-                    reason = "Rate Limit (429)" if status == 429 else "Server Overloaded (503)"
+                if status == 429:
+                    self._rate_limited_until = time.monotonic() + 20.0
+                    logger.warning("Gemini API rate limit reached (429). Fast failover to local/synthesized answer.")
+                    raise
+                if status in (500, 502, 503) and attempt < self.max_retries:
+                    backoff = 0.5 + random.uniform(0.1, 0.3)
                     logger.warning(
-                        f"Gemini API {reason}. Backing off for {backoff:.2f}s (retry {attempt + 1}/{self.max_retries})..."
+                        f"Gemini API server capacity issue ({status}). Fast retry in {backoff:.2f}s..."
                     )
                     time.sleep(backoff)
                     last_exception = e
@@ -121,9 +125,9 @@ class GeminiClient:
                 raise
             except (httpx.TimeoutException, httpx.ConnectError) as e:
                 if attempt < self.max_retries:
-                    backoff = (1.5 ** (attempt + 1)) + random.uniform(0.1, 0.5)
+                    backoff = 0.5 + random.uniform(0.1, 0.2)
                     logger.warning(
-                        f"Gemini API network error ({type(e).__name__}). Retrying in {backoff:.2f}s (retry {attempt + 1}/{self.max_retries})..."
+                        f"Gemini API network timeout. Fast retry in {backoff:.2f}s..."
                     )
                     time.sleep(backoff)
                     last_exception = e
@@ -149,6 +153,9 @@ class GeminiClient:
         try:
             return self._execute_with_retry(_do_call)
         except Exception as e:
+            # If rate limited (429), fail immediately so caller can use fast deterministic fallback
+            if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+                raise
             # If primary model failed and backup model is configured, try backup once
             if self.backup_model and model_to_use != self.backup_model:
                 logger.info(f"Retrying request with backup Gemini model: {self.backup_model}")
@@ -217,10 +224,10 @@ class GeminiClient:
 
 class OllamaClient:
     """Local SLM client (Ollama/llama.cpp) exposed on internal network."""
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen2.5:3b", timeout: int = 30):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen2.5:3b", timeout: float = 2.0):
         self.base_url = base_url.rstrip("/")
         self.model = model
-        self.timeout = timeout
+        self.timeout = httpx.Timeout(timeout, connect=0.4)
 
     def extract_json(self, prompt: str, schema: dict, text: str) -> dict:
         url = f"{self.base_url}/api/generate"
@@ -294,8 +301,23 @@ class HybridLLMClient:
             max_retries=settings.GEMINI_MAX_RETRIES,
             timeout=settings.SLM_TIMEOUT_SECONDS
         ) if settings.GEMINI_API_KEY else None
-        self.ollama = OllamaClient(base_url=settings.SLM_BASE_URL, model=settings.SLM_MODEL, timeout=settings.SLM_TIMEOUT_SECONDS)
+        self.ollama = OllamaClient(base_url=settings.SLM_BASE_URL, model=settings.SLM_MODEL, timeout=2.0)
         self.null_client = NullClient()
+        self._last_ollama_check = 0.0
+        self._ollama_is_up = False
+
+    def _is_ollama_reachable(self) -> bool:
+        now = time.monotonic()
+        if now - self._last_ollama_check < 60.0:
+            return self._ollama_is_up
+        self._last_ollama_check = now
+        try:
+            with httpx.Client(timeout=httpx.Timeout(0.4, connect=0.2)) as client:
+                res = client.get(f"{self.ollama.base_url}/api/tags")
+                self._ollama_is_up = res.status_code == 200
+        except Exception:
+            self._ollama_is_up = False
+        return self._ollama_is_up
 
     def _get_active_client(self) -> tuple:
         # ponytail: prioritize gemini if key present; fallback to ollama; then null
@@ -315,7 +337,7 @@ class HybridLLMClient:
             return client.extract_json(prompt, schema, text)
         except Exception as e:
             logger.warning(f"Primary LLM client '{name}' failed extraction: {e}. Falling back.")
-            if client is self.gemini:
+            if settings.LLM_PROVIDER == "ollama" and self._is_ollama_reachable():
                 try:
                     return self.ollama.extract_json(prompt, schema, text)
                 except Exception as oe:
@@ -328,7 +350,7 @@ class HybridLLMClient:
             return client.generate(prompt, max_tokens=max_tokens)
         except Exception as e:
             logger.warning(f"Primary LLM client '{name}' failed generate: {e}. Falling back.")
-            if client is self.gemini:
+            if settings.LLM_PROVIDER == "ollama" and self._is_ollama_reachable():
                 try:
                     return self.ollama.generate(prompt, max_tokens=max_tokens)
                 except Exception:

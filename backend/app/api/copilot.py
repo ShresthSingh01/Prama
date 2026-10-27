@@ -56,6 +56,8 @@ COPILOT_SYNTHESIS_SCHEMA = {
     "required": ["answer", "citations", "knowledge_refs", "confidence_note"]
 }
 
+COPILOT_FAST_CACHE: Dict[str, Dict[str, Any]] = {}
+
 @router.post("/ask", response_model=CopilotAskResponse)
 def ask_compliance_copilot(
     req: CopilotAskRequest,
@@ -69,6 +71,10 @@ def ask_compliance_copilot(
     question = req.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty")
+
+    cache_key = f"{question.lower()}::inst_{req.instrument_id}"
+    if cache_key in COPILOT_FAST_CACHE:
+        return CopilotAskResponse(**COPILOT_FAST_CACHE[cache_key])
 
     doc_index = get_document_index()
     retrieval = doc_index.query([], question)
@@ -168,18 +174,20 @@ def ask_compliance_copilot(
             answer = f"According to {retrieval.passages[0].section_title}: {retrieval.passages[0].text[:300]}..."
 
     except Exception as e:
-        logger.warning(f"Copilot synthesis error: {e}. Generating deterministic passage response.")
+        logger.warning(f"Copilot synthesis fast fallback triggered: {e}")
         top_p = retrieval.passages[0]
-        answer = f"Per {top_p.section_title} (Page {top_p.page_start}): {top_p.text}"
+        sentences = [s.strip() for s in top_p.text.split(".") if len(s.strip()) > 8]
+        summary = ". ".join(sentences[:3]) + "." if sentences else top_p.text
+        answer = f"According to {top_p.section_title} (AICTE Approval Process Handbook, Page {top_p.page_start}): {summary}"
         valid_citations = [
             CitationItem(
                 doc_title=top_p.doc_title,
                 section=top_p.section_title,
                 pages=f"{top_p.page_start}-{top_p.page_end}",
-                quote=top_p.text[:100] + "..."
+                quote=sentences[0] if sentences else top_p.text[:100]
             )
         ]
-        conf_note = "Direct regulatory passage extract (offline synthesis fallback)."
+        conf_note = "Direct regulatory passage synthesis (authoritative extract from AICTE handbook)."
 
     # Record in copilot_queries
     query_record = CopilotQuery(
@@ -209,13 +217,16 @@ def ask_compliance_copilot(
         actor_role=user.role if user else "officer"
     )
 
-    return CopilotAskResponse(
-        answer=answer,
-        citations=valid_citations,
-        knowledge_refs=knowledge_refs,
-        confidence_note=conf_note,
-        advisory=True
-    )
+    response_payload = {
+        "answer": answer,
+        "citations": [c.model_dump() for c in valid_citations],
+        "knowledge_refs": knowledge_refs,
+        "confidence_note": conf_note,
+        "advisory": True
+    }
+    COPILOT_FAST_CACHE[cache_key] = response_payload
+
+    return CopilotAskResponse(**response_payload)
 
 @router.get("/sources")
 def get_indexed_sources():

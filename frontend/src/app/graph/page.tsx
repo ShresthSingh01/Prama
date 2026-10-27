@@ -33,6 +33,7 @@ interface RawNode {
   amount?: number;
   risk?: string;
   size?: number;
+  sha256?: string;
 }
 
 interface RawLink {
@@ -157,7 +158,7 @@ export default function GraphPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeRing, setActiveRing] = useState<CollusionRing | null>(null);
   const [selectedNode, setSelectedNode] = useState<RawNode | null>(null);
-  const [filterMode, setFilterMode] = useState<"ALL" | "SYNDICATE" | "INSTITUTIONS" | "BANKS">("ALL");
+  const [filterMode, setFilterMode] = useState<"SYNDICATE" | "ALL" | "INSTITUTIONS" | "BANKS">("SYNDICATE");
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -186,52 +187,187 @@ export default function GraphPage() {
     loadGraph();
   }, []);
 
-  // Layout positions using grid columns
+  // Layout positions: High-performance, explainable 3-tier syndicate layout
   useEffect(() => {
     if (!graphData) return;
 
-    let targetRawNodes = graphData.nodes;
-
     if (filterMode === "SYNDICATE" && activeRing) {
       const ringInsts = new Set(activeRing.involved_institutions);
-      targetRawNodes = targetRawNodes.filter(n => 
-        ringInsts.has(n.label) || 
-        (activeRing.fdr_number && n.label.includes(activeRing.fdr_number)) ||
-        n.type === "document"
+      const ringFdr = activeRing.fdr_number;
+      const ringSha = activeRing.sha256;
+
+      // 1. Colleges involved in this specific ring
+      const instNodes = graphData.nodes.filter(
+        n => n.type === "institution" && ringInsts.has(n.label)
       );
-    } else if (filterMode === "INSTITUTIONS") {
-      targetRawNodes = targetRawNodes.filter(n => n.type === "institution");
-    } else if (filterMode === "BANKS") {
-      targetRawNodes = targetRawNodes.filter(n => n.type === "bank" || n.type === "fdr");
+      const instIds = new Set(instNodes.map(n => n.id));
+
+      // 2. Shared FDR Serial instrument
+      const fdrNodes = graphData.nodes.filter(n => {
+        if (n.type !== "fdr") return false;
+        if (ringFdr && n.label.includes(ringFdr)) return true;
+        return graphData.links.some(l => instIds.has(l.source) && l.target === n.id);
+      });
+      const fdrIds = new Set(fdrNodes.map(n => n.id));
+
+      // 3. Clashed Document node (if applicable)
+      const docNodes = graphData.nodes.filter(n => {
+        if (n.type !== "document") return false;
+        if (ringSha && (n.id.includes(ringSha.slice(0, 8)) || (n.sha256 && n.sha256.startsWith(ringSha.slice(0, 8))))) return true;
+        return graphData.links.some(l => fdrIds.has(l.source) && l.target === n.id);
+      });
+      const docIds = new Set(docNodes.map(n => n.id));
+
+      // 4. Commercial Bank issuing the instrument
+      const bankNodes = graphData.nodes.filter(n => {
+        if (n.type !== "bank") return false;
+        return graphData.links.some(l => fdrIds.has(l.source) && l.target === n.id);
+      });
+      const bankIds = new Set(bankNodes.map(n => n.id));
+
+      const flowNodes: Node[] = [];
+
+      // Col 1 (Left): Colluding Colleges
+      const instStartY = Math.max(50, 220 - (instNodes.length * 55));
+      instNodes.forEach((n, idx) => {
+        flowNodes.push({
+          id: n.id,
+          type: n.type,
+          position: { x: 80, y: instStartY + idx * 130 },
+          data: {
+            label: n.label,
+            state: n.state,
+            amount: n.amount,
+            risk: n.risk || "CRITICAL",
+            isRingMember: true
+          }
+        });
+      });
+
+      // Col 2 (Center): Shared Duplicate FDR & Clashed Documents
+      fdrNodes.forEach((n, idx) => {
+        flowNodes.push({
+          id: n.id,
+          type: n.type,
+          position: { x: 500, y: 140 + idx * 150 },
+          data: {
+            label: n.label,
+            state: n.state,
+            amount: n.amount,
+            risk: "CRITICAL",
+            isRingMember: true
+          }
+        });
+      });
+
+      docNodes.forEach((n, idx) => {
+        flowNodes.push({
+          id: n.id,
+          type: n.type,
+          position: { x: 500, y: 310 + idx * 150 },
+          data: {
+            label: n.label,
+            state: n.state,
+            amount: n.amount,
+            risk: "CRITICAL",
+            isRingMember: true
+          }
+        });
+      });
+
+      // Col 3 (Right): Issuing Bank Branch
+      bankNodes.forEach((n, idx) => {
+        flowNodes.push({
+          id: n.id,
+          type: n.type,
+          position: { x: 920, y: 180 + idx * 150 },
+          data: {
+            label: n.label,
+            state: n.state,
+            amount: n.amount,
+            risk: n.risk,
+            isRingMember: false
+          }
+        });
+      });
+
+      const activeIds = new Set(flowNodes.map(n => n.id));
+      const flowEdges: Edge[] = [];
+
+      graphData.links.forEach((l, idx) => {
+        if (activeIds.has(l.source) && activeIds.has(l.target)) {
+          const isDuplicatePledge = instIds.has(l.source) && fdrIds.has(l.target);
+          const isDocClash = fdrIds.has(l.source) && docIds.has(l.target);
+          const isBankLink = fdrIds.has(l.source) && bankIds.has(l.target);
+
+          let edgeLabel = "";
+          if (isDuplicatePledge) edgeLabel = "DUPLICATE PLEDGE";
+          else if (isDocClash) edgeLabel = "CLASHED FILE";
+          else if (isBankLink) edgeLabel = "ISSUED AT";
+
+          flowEdges.push({
+            id: `e-${l.source}-${l.target}-${idx}`,
+            source: l.source,
+            target: l.target,
+            animated: true,
+            label: edgeLabel,
+            labelStyle: {
+              fill: isDuplicatePledge ? "#ef4444" : "#8b5cf6",
+              fontWeight: 700,
+              fontSize: 10,
+              fontFamily: "monospace"
+            },
+            labelBgStyle: {
+              fill: isDark ? "#18181b" : "#ffffff",
+              fillOpacity: 0.9,
+              rx: 4
+            },
+            style: {
+              stroke: isDuplicatePledge ? "#ef4444" : "#8b5cf6",
+              strokeWidth: isDuplicatePledge ? 2.5 : 2,
+              strokeDasharray: isDuplicatePledge ? "5 5" : undefined
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: isDuplicatePledge ? "#ef4444" : "#8b5cf6",
+              width: 14,
+              height: 14
+            }
+          });
+        }
+      });
+
+      setNodes(flowNodes);
+      setEdges(flowEdges);
+      return;
     }
 
-    const ringInstitutions = new Set(activeRing?.involved_institutions || []);
-    const ringFdr = activeRing?.fdr_number;
+    // Grid Layout for ALL, INSTITUTIONS, or BANKS view modes
+    let targetRawNodes = graphData.nodes;
+    if (filterMode === "INSTITUTIONS") {
+      targetRawNodes = targetRawNodes.filter(n => n.type === "institution").slice(0, 30);
+    } else if (filterMode === "BANKS") {
+      targetRawNodes = targetRawNodes.filter(n => n.type === "bank" || n.type === "fdr").slice(0, 30);
+    } else {
+      const ringInsts = new Set(graphData.collusion_rings.flatMap(r => r.involved_institutions));
+      const ringNodes = targetRawNodes.filter(n => ringInsts.has(n.label) || n.risk === "CRITICAL");
+      const otherNodes = targetRawNodes.filter(n => !ringInsts.has(n.label) && n.risk !== "CRITICAL");
+      targetRawNodes = [...ringNodes, ...otherNodes].slice(0, 35);
+    }
 
-    const columnX: Record<string, number> = {
-      institution: 100,
-      bank: 500,
-      fdr: 900,
-      document: 1300
-    };
+    const cols = 5;
+    const colWidth = 240;
+    const rowHeight = 130;
 
-    const rowCounters: Record<string, number> = {
-      institution: 0,
-      bank: 0,
-      fdr: 0,
-      document: 0
-    };
+    const flowNodes: Node[] = targetRawNodes.map((n, idx) => {
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      const x = col * colWidth + 60;
+      const y = row * rowHeight + 60;
 
-    const flowNodes: Node[] = targetRawNodes.map((n) => {
-      const col = n.type in columnX ? n.type : "institution";
-      const x = columnX[col] + (Math.sin(rowCounters[col]) * 40);
-      const y = rowCounters[col] * 90 + 50;
-      rowCounters[col]++;
-
-      const isRingMember = 
-        ringInstitutions.has(n.label) || 
-        (Boolean(ringFdr) && n.label.includes(ringFdr || "")) ||
-        n.type === "document";
+      const isRingMember = graphData.collusion_rings.some(
+        r => r.involved_institutions.includes(n.label) || (r.fdr_number && n.label.includes(r.fdr_number))
+      );
 
       return {
         id: n.id,
@@ -252,30 +388,21 @@ export default function GraphPage() {
 
     graphData.links.forEach((l, idx) => {
       if (nodeIds.has(l.source) && nodeIds.has(l.target)) {
-        const sourceNode = targetRawNodes.find(n => n.id === l.source);
-        const targetNode = targetRawNodes.find(n => n.id === l.target);
-        const isRingEdge = Boolean(
-          (sourceNode && ringInstitutions.has(sourceNode.label)) ||
-          (targetNode && ringInstitutions.has(targetNode.label)) ||
-          (sourceNode && ringFdr && sourceNode.label.includes(ringFdr)) ||
-          (targetNode && ringFdr && targetNode.label.includes(ringFdr))
-        );
-
         flowEdges.push({
-          id: `e-${l.source}-${l.target}-${idx}`,
+          id: `e-all-${l.source}-${l.target}-${idx}`,
           source: l.source,
           target: l.target,
-          animated: isRingEdge,
+          animated: false,
           style: {
-            stroke: isRingEdge ? "#ef4444" : (isDark ? "#52525b" : "#94a3b8"),
-            strokeWidth: isRingEdge ? 2.5 : 1.2,
-            opacity: isRingEdge ? 1 : 0.6
+            stroke: isDark ? "#52525b" : "#94a3b8",
+            strokeWidth: 1.2,
+            opacity: 0.6
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: isRingEdge ? "#ef4444" : (isDark ? "#52525b" : "#94a3b8"),
-            width: 14,
-            height: 14
+            color: isDark ? "#52525b" : "#94a3b8",
+            width: 12,
+            height: 12
           }
         });
       }
@@ -318,26 +445,27 @@ export default function GraphPage() {
         {/* View Mode Filters */}
         <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-1 rounded-lg text-xs shadow-sm">
           <button
-            onClick={() => setFilterMode("ALL")}
-            className={`px-3 py-1 rounded-md font-medium transition ${filterMode === "ALL" ? "bg-amber-500 text-slate-950 font-bold" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
+            onClick={() => setFilterMode("SYNDICATE")}
+            className={`px-3 py-1.5 rounded-md font-semibold transition flex items-center gap-1.5 ${filterMode === "SYNDICATE" ? "bg-rose-500 text-white shadow-sm" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
-            All Nodes
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Fraud Rings (Focused)</span>
           </button>
           <button
-            onClick={() => setFilterMode("SYNDICATE")}
-            className={`px-3 py-1 rounded-md font-medium transition ${filterMode === "SYNDICATE" ? "bg-rose-500 text-white font-bold" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
+            onClick={() => setFilterMode("ALL")}
+            className={`px-3 py-1.5 rounded-md font-semibold transition ${filterMode === "ALL" ? "bg-amber-500 text-slate-950 shadow-sm" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
-            Fraud Rings Only
+            Cluster Overview
           </button>
           <button
             onClick={() => setFilterMode("INSTITUTIONS")}
-            className={`px-3 py-1 rounded-md font-medium transition ${filterMode === "INSTITUTIONS" ? "bg-blue-600 text-white font-bold" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
+            className={`px-3 py-1.5 rounded-md font-semibold transition ${filterMode === "INSTITUTIONS" ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
-            Institutions
+            Colleges Only
           </button>
           <button
             onClick={() => setFilterMode("BANKS")}
-            className={`px-3 py-1 rounded-md font-medium transition ${filterMode === "BANKS" ? "bg-purple-600 text-white font-bold" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
+            className={`px-3 py-1.5 rounded-md font-semibold transition ${filterMode === "BANKS" ? "bg-purple-600 text-white shadow-sm" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
             Banks & FDRs
           </button>
