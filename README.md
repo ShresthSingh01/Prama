@@ -5,7 +5,7 @@
 ![AICTE Banner](https://img.shields.io/badge/AICTE-Regulation_Bureau-003366?style=for-the-badge&logo=gov.in&logoColor=white)
 ![Hackathon](https://img.shields.io/badge/Smart_India_Hackathon-PS_26265-FF9933?style=for-the-badge)
 ![Category](https://img.shields.io/badge/Category-Software_%2F_Smart_Automation-138808?style=for-the-badge)
-![Status](https://img.shields.io/badge/Tests-18%2F18_Passing-success?style=for-the-badge)
+![Status](https://img.shields.io/badge/Tests-25%2F25_Passing-success?style=for-the-badge)
 
 **Prama (प्रमा) — Valid Knowledge, Truth & Sovereign Trust**  
 *Turning passive document archiving into active cryptographic trust, forensic discrepancy detection, and regulatory risk intelligence.*
@@ -225,7 +225,7 @@ npm run dev
 ```
 - Web Terminal: `http://localhost:3000`
 
-#### 3. Run Automated Acceptance Suite (18/18 Passing)
+#### 3. Run Automated Acceptance Suite (25/25 Passing)
 ```powershell
 $env:PYTHONPATH="."
 .\.venv\Scripts\pytest.exe -v
@@ -303,16 +303,19 @@ Designed for rapid, high-impact demonstration during hackathon evaluation rounds
 
 | Requirement from AICTE Problem Statement | Implementation in Prama | Relevant Endpoint / View |
 |---|---|---|
-| **1. Centralized Repository** | Multi-institution database tracking status, bank IFSC, amounts, and validity dates. | `/api/v1/instruments`, `/queue` |
-| **2. Digital Document Management** | Encrypted local storage vault with PDF extraction and SHA-256 binary hash checks. | `backend/storage_vault/`, `/inspector/[id]` |
-| **3. Verification & Discrepancy Detection** | Automated Rules Engine (R01-R09) evaluating format, tenure math, rates, and name matches. | `backend/app/services/rules_engine.py` |
-| **4. Distinguish Submitted vs. Confirmed** | Four-Tier Provenance Matrix (`Self-Declared` $\to$ `Doc-Extracted` $\to$ `Cross-Validated` $\to$ `Bank-Confirmed`). | Field Provenance Badges across UI |
-| **5. Automated Validity & Maturity Tracking** | Time Machine engine with 24-month maturity cliff radar and T-90/60/30 escalation tracking. | `/demo/advance`, Cockpit Horizon |
-| **6. Renewal & Replacement Monitoring** | Lifecycle state transitions tracking replacement instruments with audit log linkages. | `backend/app/models/entities.py` |
-| **7. Release & Refund Workflow** | Strict Maker-Checker enforcement; scrutiny officers cannot approve their own release requests. | `/api/v1/release`, `/release` |
-| **8. Automated Alerts & Escalation** | Bilingual (Hindi/English) reminder generation with numeric fidelity guards. | `/api/v1/slm/reminder-draft` |
-| **9. Centralized Management Dashboard** | Real-time counts of active, expiring, matured, renewed, and pending deposits. | `/api/v1/dashboard/summary`, `/` |
-| **10. Audit Trail & Data Security** | SHA-256 append-only tamper-evident Merkle hash chain with live backdoor sabotage detector. | `/api/v1/audit/verify`, `/audit` |
+| **1. Centralized Repository** | Multi-institution database tracking status, bank IFSC, amounts, tenures, interest rates, and validity dates. | `/api/v1/instruments`, `/queue` |
+| **2. Digital Document Management** | Real PDF extraction pipeline (`pypdf` without fake data), SHA-256 digests, and secure download routes. | `/api/v1/instruments/{id}/documents`, `/download` |
+| **3. Multi-Tenant Role Isolation** | Server-side RBAC (`check_institution_access`) ensuring colleges only access their own FDRs (403 Forbidden). | `/api/v1/auth/login`, `/auth/personas` |
+| **4. Verification & Discrepancy Detection** | Automated form-vs-document reconciliation raising `FORM_DOC_AMOUNT_DISCREPANCY` and `FORM_DOC_SERIAL_MISMATCH`. | `backend/app/api/instruments.py` |
+| **5. Legitimate Bank Verification** | Offline Ed25519 QR envelope verification + single-use bank verification links with atomic token replay protection. | `/api/v1/instruments/{id}/verify/qr`, `/bank-verify/{token}` |
+| **6. Distinguish Submitted vs. Confirmed** | Four-Tier Provenance Matrix (`Self-Declared` $\to$ `Doc-Extracted` $\to$ `Cross-Validated` $\to$ `Bank-Confirmed`) per field. | Field Provenance Badges across UI |
+| **7. Automated Validity & Maturity Tracking** | Time Machine engine with 24-month maturity cliff radar and T-90/60/30 escalation tracking. | `/api/v1/demo/advance-clock`, Cockpit Horizon |
+| **8. Renewal & Replacement Monitoring** | Parent-child instrument linkage preserving complete 10-year audit history (`parent_instrument_id`, parent status `RENEWED`). | `/api/v1/instruments/{id}/renew`, Inspector UI |
+| **9. Automated Alerts & Escalation** | Bilingual (Hindi/English) reminder generation with numeric fidelity guards and audit-logged dispatch states. | `/api/v1/slm/reminder-draft`, `clock_service.py` |
+| **10. Release & Refund Workflow** | AICTE APH Clause 6.46 5-point release-readiness engine, strict Maker-Checker dual control, and high-res PDF certificate. | `/api/v1/release-requests`, `/certificate`, `/release` |
+| **11. Centralized Management Dashboard** | Real-time counts of active, expiring, matured, renewed, and pending deposits with zero reconciliation drift. | `/api/v1/dashboard/summary`, `/` |
+| **12. Audit Trail & Data Security** | Sequential full-chain SHA-256 hash verification without caching bypass; live backdoor sabotage detector. | `/api/v1/audit/verify`, `/audit` |
+| **13. Automated Statutory Reports** | 4 Mandated statutory reports (Pending Verifications, Upcoming Maturities, Missing Documents, Intervention Cases) with CSV/JSON exports. | `/api/v1/reports/*`, Queue UI Export Dropdown |
 
 ---
 
@@ -327,7 +330,7 @@ Designed for rapid, high-impact demonstration during hackathon evaluation rounds
 | **Database & ORM** | **SQLAlchemy 2.0 (Dual-Engine)** | Instant zero-setup local SQLite WAL mode + enterprise PostgreSQL compatibility. |
 | **Cryptography** | **Ed25519 (PyCA Cryptography)** | Military-grade asymmetric signing for offline QR verification; immune to typical RSA key vulnerabilities. |
 | **Audit Ledger** | **Canonical SHA-256 Hash Chain** | Cryptographic block-by-block sealing guarantees non-repudiation and detects direct database tampering. |
-| **Forensic Imaging** | **Pillow (ELA Heatmaps) + PyMuPDF** | Pure-Python digital forensic image recompression analysis avoiding fragile C++ binary dependencies. |
+| **Document & Forensics** | **Pillow (ELA Heatmaps & PDF Release Certificates) + pypdf** | Pure-Python digital forensic image recompression & text extraction avoiding fragile external C++ binary dependencies. |
 | **Multi-Provider AI** | **Google Gemini + Ollama SLM** | Cloud intelligence with local fallback, substring extraction guards, and AST-enforced approval isolation. |
 
 ---
@@ -340,17 +343,19 @@ SIH2nd/
 │   ├── app/
 │   │   ├── api/                   # REST API route controllers
 │   │   │   ├── audit.py           # Cryptographic ledger endpoints
+│   │   │   ├── auth.py            # RBAC login, token verification & tenant isolation
 │   │   │   ├── copilot.py         # AICTE PageIndex Copilot queries
 │   │   │   ├── dashboard.py       # Live summary & maturity cliff calculations
 │   │   │   ├── demo.py            # Simulated Clock & Backdoor Sabotage actions
 │   │   │   ├── evaluation.py      # Adversarial precision/recall benchmark suite
 │   │   │   ├── graph.py           # Syndicate collusion network topology
-│   │   │   ├── instruments.py     # FDR CRUD & field provenance management
+│   │   │   ├── instruments.py     # FDR CRUD, document uploads & renewal lineage
 │   │   │   ├── knowledge_api.py   # OKF bundle status & hot-reload endpoints
 │   │   │   ├── mock_bank.py       # Bank nodal tokenized OTP confirmation
-│   │   │   ├── release.py         # Maker-Checker release approval workflow
+│   │   │   ├── release.py         # Maker-Checker release approval & PDF certificates
+│   │   │   ├── reports.py         # 4 Mandated PS 26265 statutory reports (CSV & JSON)
 │   │   │   ├── slm.py             # Guarded SLM tasks (NL search, Hindi drafts)
-│   │   │   └── verification.py    # Ed25519 QR & ELA forensic analysis
+│   │   │   └── verification.py    # Ed25519 QR, ELA forensics & single-use tokens
 │   │   ├── core/                  # Configuration, security & cryptographic engines
 │   │   │   ├── config.py          # Environment settings & provider routing
 │   │   │   ├── crypto.py          # Ed25519 key generation, sign & verify
@@ -361,13 +366,16 @@ SIH2nd/
 │   │   ├── schemas/               # Pydantic v2 validation schemas
 │   │   ├── services/              # Business logic & forensic services
 │   │   │   ├── audit_service.py   # SHA-256 block creation & chain verification
+│   │   │   ├── certificate_service.py # Printable official PDF release certificate generator
 │   │   │   ├── clock_service.py   # Simulated demo time engine
 │   │   │   ├── document_index.py  # PageIndex tree parser & clause retriever
-│   │   │   ├── forensic_service.py# ELA heatmap generation & image analysis
+│   │   │   ├── extraction_service.py # Real PDF text extraction & field reconciliation
+│   │   │   ├── forensic_service.py# ELA heatmap generation & metadata analysis
 │   │   │   ├── graph_service.py   # Collusion cluster & network builder
 │   │   │   ├── knowledge.py       # OKF Markdown bundle parser & dynamic binding
 │   │   │   ├── llm_client.py      # Dual-provider (Gemini/Ollama/Null) client
 │   │   │   ├── qr_service.py      # Bank-signed QR generation & verification
+│   │   │   ├── release_policy.py  # AICTE APH Clause 6.46 5-point release-readiness engine
 │   │   │   ├── risk_service.py    # Survival risk scoring model
 │   │   │   ├── rules_engine.py    # Deterministic R01-R09 rules evaluation
 │   │   │   └── slm_tasks.py       # Guarded AI tasks with hallucination checks
@@ -379,7 +387,7 @@ SIH2nd/
 │   │   ├── generate_regulatory_pdf.py # Synthesizes AICTE handbook test PDF
 │   │   └── seed.py                # Seeds 600+ instruments and planted fraud rings
 │   ├── tests/                     # Automated test suites
-│   │   ├── test_acceptance.py     # Core cryptographic & workflow tests (9 tests)
+│   │   ├── test_acceptance.py     # Core cryptographic, extraction, RBAC & statutory tests (16 tests)
 │   │   └── test_addon_acceptance.py# OKF, Copilot, Guarded SLM & AST tests (9 tests)
 │   ├── fdr_sentinel.db            # Pre-seeded SQLite database in WAL mode
 │   └── requirements.txt           # Python backend dependencies
