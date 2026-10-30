@@ -37,12 +37,16 @@ def verify_instrument_qr(
     if res["valid"]:
         payload = res["payload"]
         
-        # Check payload vs declared values
+        # Check payload vs declared values across all signed attributes
         mismatches = []
-        if str(payload.get("fdr")).strip() != inst.fdr_number.strip():
+        if str(payload.get("fdr", "")).strip() != inst.fdr_number.strip():
             mismatches.append(f"FDR serial mismatch: QR has {payload.get('fdr')}, claimed {inst.fdr_number}")
         if abs(float(payload.get("amt", 0)) - inst.amount) > 0.01:
             mismatches.append(f"Amount mismatch: QR has {payload.get('amt')}, claimed {inst.amount}")
+        if payload.get("iss") and str(payload.get("iss")).strip() != str(inst.issue_date).strip():
+            mismatches.append(f"Issue date mismatch: QR has {payload.get('iss')}, claimed {inst.issue_date}")
+        if payload.get("mat") and str(payload.get("mat")).strip() != str(inst.maturity_date).strip():
+            mismatches.append(f"Maturity date mismatch: QR has {payload.get('mat')}, claimed {inst.maturity_date}")
             
         if mismatches:
             flag = Flag(
@@ -59,10 +63,12 @@ def verify_instrument_qr(
             db.commit()
             return {"success": False, "verified": False, "reason": "Payload values differ from declared values", "mismatches": mismatches}
 
-        # Provenance upgrade
+        # Granular Provenance upgrade: only fields verified in the cryptographic envelope
+        signed_fields = {"fdr_number", "amount", "issue_date", "maturity_date"}
         for p in inst.provenance_fields:
-            p.source = ProvenanceSourceEnum.BANK_CONFIRMED.value
-            p.confidence = 1.0
+            if p.field_name in signed_fields:
+                p.source = ProvenanceSourceEnum.BANK_CONFIRMED.value
+                p.confidence = 1.0
             
         inst.trust_tier = TrustTierEnum.BANK_CONFIRMED.value
         inst.status = InstrumentStatusEnum.VERIFIED.value
@@ -177,7 +183,10 @@ def submit_bank_confirmation(token: str, req: BankConfirmRequest, db: Session = 
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     ver = db.query(Verification).filter(Verification.token_hash == token_hash).first()
     if not ver or (ver.expires_at and ver.expires_at < datetime.utcnow()):
-        raise HTTPException(status_code=404, detail="Verification link invalid or expired")
+        raise HTTPException(status_code=400, detail="Verification link invalid or expired")
+        
+    if ver.responded_at is not None:
+        raise HTTPException(status_code=400, detail="Verification token has already been consumed. Replay rejected.")
         
     inst = ver.instrument
     ver.result = "confirmed" if req.decision == "confirmed" else "denied"
@@ -210,3 +219,11 @@ def submit_bank_confirmation(token: str, req: BankConfirmRequest, db: Session = 
         "responder": req.officer_email
     })
     return {"success": True, "result": ver.result}
+
+@router.post("/bank-portal/confirm")
+def submit_bank_confirmation_alias(
+    token: str,
+    req: BankConfirmRequest,
+    db: Session = Depends(get_db)
+):
+    return submit_bank_confirmation(token, req, db)

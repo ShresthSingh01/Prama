@@ -174,9 +174,9 @@ def generate_forensic_certificate(inst: Any, storage_dir: str) -> Dict[str, Any]
         qr_img = qrcode.make(qr_payload)
         qr_img.save(qr_path)
 
-    # 2. Check tampering flags
+    # 2. Check tampering flags from live database state (never hardcode ID == 1)
     flag_codes = [f.code for f in inst.flags] if getattr(inst, "flags", None) else []
-    is_tampered = any("FORGERY" in f or "TAMPER" in f or "UNAUTHORIZED" in f for f in flag_codes) or inst.id == 1
+    is_tampered = any("FORGERY" in f or "TAMPER" in f or "UNAUTHORIZED" in f for f in flag_codes)
 
     # 3. Generate Certificate Canvas if not already cached
     if not os.path.exists(cert_path):
@@ -471,6 +471,26 @@ def generate_forensic_certificate(inst: Any, storage_dir: str) -> Dict[str, Any]
             "anomaly_level": "CRITICAL"
         })
 
+    # Check if a real user document is attached to this instrument
+    real_doc_meta = None
+    has_uploaded_doc = False
+    if getattr(inst, "documents", None) and len(inst.documents) > 0:
+        doc = inst.documents[-1]
+        doc_full_path = os.path.join(docs_dir, doc.storage_key)
+        if os.path.exists(doc_full_path) and doc_full_path.lower().endswith(".pdf"):
+            real_doc_meta = inspect_pdf_metadata(doc_full_path)
+            has_uploaded_doc = True
+
+    pdf_metadata_payload = real_doc_meta if real_doc_meta else {
+        "producer": "Adobe InDesign / Spliced Graphics Editor" if is_tampered else "Core Banking Finacle 11.4 / AICTE Scanned Service",
+        "creator": "Unauthorized Export Filter" if is_tampered else "Scheduled Bank Security Print Server",
+        "mod_date": "D:20260216142209+05'30'",
+        "creation_date": "D:20260215112000+05'30'",
+        "is_suspicious": is_tampered,
+        "suspicious_tool": "canva/photoshop" if is_tampered else None,
+        "explanation": "Document exhibits multiple recompression passes and localized raster splicing." if is_tampered else "No suspicious editing tool signatures found in document structure."
+    }
+
     return {
         "instrument_id": inst.id,
         "fdr_number": inst.fdr_number,
@@ -481,15 +501,9 @@ def generate_forensic_certificate(inst: Any, storage_dir: str) -> Dict[str, Any]
         "anomaly_score": 0.78 if is_tampered else round(ela_res.get("anomaly_score", 0.048), 3),
         "is_tampered": is_tampered,
         "tamper_risk": "CRITICAL_FORGERY_DETECTED" if is_tampered else "AUTHENTIC_UNIFORM_COMPRESSION",
-        "pdf_metadata": {
-            "producer": "Adobe InDesign / Spliced Graphics Editor" if is_tampered else "Core Banking Finacle 11.4 / AICTE Scanned Service",
-            "creator": "Unauthorized Export Filter" if is_tampered else "Scheduled Bank Security Print Server",
-            "mod_date": "D:20260216142209+05'30'",
-            "creation_date": "D:20260215112000+05'30'",
-            "is_suspicious": is_tampered,
-            "suspicious_tool": "canva/photoshop" if is_tampered else None,
-            "explanation": "Document exhibits multiple recompression passes and localized raster splicing." if is_tampered else "No suspicious editing tool signatures found in document structure."
-        },
+        "has_uploaded_doc": has_uploaded_doc,
+        "is_demo_artifact": not has_uploaded_doc,
+        "pdf_metadata": pdf_metadata_payload,
         "ocr_boxes": ocr_boxes,
         "suspicious_regions": suspicious_regions,
         "cryptographic_envelope": {

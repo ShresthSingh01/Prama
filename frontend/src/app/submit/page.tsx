@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  FileText, ArrowRight, AlertTriangle
+  FileText, ArrowRight, AlertTriangle, Upload, CheckCircle2, FileCheck, ShieldCheck
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -18,7 +18,11 @@ export default function SubmitFdrPage() {
   const router = useRouter();
   const [banks, setBanks] = useState<BankOption[]>([]);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [statusStep, setStatusStep] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  
+  const [fdrFile, setFdrFile] = useState<File | null>(null);
+  const [supportingDoc, setSupportingDoc] = useState<File | null>(null);
 
   const [form, setForm] = useState({
     institution_id: 1,
@@ -47,20 +51,49 @@ export default function SubmitFdrPage() {
     e.preventDefault();
     setSubmitting(true);
     setErrorMsg("");
+    setStatusStep("Registering deposit record in central repository...");
 
     try {
+      // 1. Register Instrument Record
       const res = await fetchApi<any>("/instruments", {
         method: "POST",
         body: JSON.stringify(form)
       });
 
-      if (res.id || (res.success && res.id)) {
-        router.push(`/inspector/${res.id}`);
-      } else {
+      const newId = res.id;
+      if (!newId) {
         throw new Error(res.message || "Failed to register FDR instrument");
       }
+
+      // 2. Upload Original FDR Document if provided
+      if (fdrFile) {
+        setStatusStep("Uploading original FDR receipt & running automatic field extraction...");
+        const formData = new FormData();
+        formData.append("file", fdrFile);
+        formData.append("kind", "FDR_RECEIPT");
+        await fetchApi<any>(`/instruments/${newId}/documents`, {
+          method: "POST",
+          body: formData
+        });
+      }
+
+      // 3. Upload Supporting Document if provided
+      if (supportingDoc) {
+        setStatusStep("Attaching statutory Affidavit 6 compliance record...");
+        const suppFormData = new FormData();
+        suppFormData.append("file", supportingDoc);
+        suppFormData.append("kind", "AFFIDAVIT_6");
+        await fetchApi<any>(`/instruments/${newId}/documents`, {
+          method: "POST",
+          body: suppFormData
+        });
+      }
+
+      setStatusStep("Compliance rules evaluated. Redirecting to Deposit Inspector...");
+      router.push(`/inspector/${newId}`);
     } catch (e: any) {
       setErrorMsg(e.message || "Deposit registration failed");
+      setStatusStep("");
     } finally {
       setSubmitting(false);
     }
@@ -75,7 +108,7 @@ export default function SubmitFdrPage() {
           Register New Institutional Fixed Deposit (FDR)
         </h1>
         <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-          Submit official bank fixed deposit receipt credentials pledged in favor of AICTE.
+          Submit official bank fixed deposit receipt credentials & original documents pledged in favor of AICTE.
         </p>
       </div>
 
@@ -216,17 +249,87 @@ export default function SubmitFdrPage() {
           />
         </div>
 
-        {/* Submit Button */}
+        {/* Real Document Upload Section (Mandated by PS 26265) */}
+        <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 space-y-3">
+          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            Digital Document Submission & OCR Ingestion
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* FDR Receipt Upload Dropzone */}
+            <div className="border-2 border-dashed border-slate-300 dark:border-zinc-700 rounded-xl p-4 text-center hover:border-amber-500 dark:hover:border-amber-400 transition bg-slate-50/50 dark:bg-zinc-950/50">
+              <Upload className="w-6 h-6 text-slate-400 dark:text-zinc-500 mx-auto mb-2" />
+              <label className="font-semibold text-slate-800 dark:text-zinc-200 block mb-1 cursor-pointer">
+                <span>Upload Original FDR Receipt (PDF / Image)</span>
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setFdrFile(e.target.files[0]);
+                    }
+                  }}
+                />
+              </label>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                {fdrFile ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center justify-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {fdrFile.name} ({(fdrFile.size / 1024).toFixed(1)} KB)
+                  </span>
+                ) : (
+                  "Accepts official digital e-FDR or scanned certificate"
+                )}
+              </p>
+            </div>
+
+            {/* Supporting Document Upload Dropzone */}
+            <div className="border-2 border-dashed border-slate-300 dark:border-zinc-700 rounded-xl p-4 text-center hover:border-amber-500 dark:hover:border-amber-400 transition bg-slate-50/50 dark:bg-zinc-950/50">
+              <FileCheck className="w-6 h-6 text-slate-400 dark:text-zinc-500 mx-auto mb-2" />
+              <label className="font-semibold text-slate-800 dark:text-zinc-200 block mb-1 cursor-pointer">
+                <span>Upload Supporting Affidavit 6 / EoA Letter</span>
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setSupportingDoc(e.target.files[0]);
+                    }
+                  }}
+                />
+              </label>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                {supportingDoc ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center justify-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {supportingDoc.name} ({(supportingDoc.size / 1024).toFixed(1)} KB)
+                  </span>
+                ) : (
+                  "Trust undertaking or AICTE approval letter (PDF/Image)"
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Submit Button & Progress Indicator */}
         <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-zinc-400">
-            On submission, AICTE automated compliance checks (Rules R01-R09) and the tamper-proof audit log will execute immediately.
+            {statusStep ? (
+              <span className="text-amber-600 dark:text-amber-400 font-medium animate-pulse">{statusStep}</span>
+            ) : (
+              "On submission, AICTE automated compliance checks (Rules R01-R09) and the tamper-proof audit log will execute immediately."
+            )}
           </div>
           <button
             type="submit"
             disabled={submitting}
             className="flex items-center justify-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition shadow-sm shrink-0"
           >
-            <span>{submitting ? "Registering Deposit..." : "Register Deposit Certificate"}</span>
+            <span>{submitting ? "Processing & Extracting..." : "Register Deposit Certificate"}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

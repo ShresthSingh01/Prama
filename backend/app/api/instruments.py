@@ -1,14 +1,17 @@
 import os
+import re
+import uuid
 import shutil
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload, selectinload
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, Institution, Bank, Document, FieldProvenance,
     Flag, Verification, Observation, User, InstrumentStatusEnum,
-    TrustTierEnum, ProvenanceSourceEnum
+    TrustTierEnum, ProvenanceSourceEnum, OcrResult
 )
 from backend.app.core.config import settings
 from backend.app.core.crypto import compute_file_sha256, compute_image_dhash
@@ -17,11 +20,12 @@ from backend.app.services.audit_service import log_audit_entry
 from backend.app.services.rules_engine import evaluate_instrument_rules
 from backend.app.services.risk_service import compute_instrument_risk_score
 from backend.app.services.forensic_service import (
-    perform_error_level_analysis, inspect_pdf_metadata, extract_document_fields,
+    perform_error_level_analysis, inspect_pdf_metadata,
     get_instrument_forensics
 )
+from backend.app.services.extraction_service import extract_from_document
 from backend.app.schemas.api_schemas import InstrumentCreate
-from backend.app.api.auth import get_optional_user, get_current_user
+from backend.app.api.auth import get_optional_user, get_current_user, check_institution_access
 
 router = APIRouter(prefix="/instruments", tags=["Instruments"])
 
@@ -94,17 +98,24 @@ def list_instruments(
     return items
 
 @router.get("/{id}")
-def get_instrument_detail(id: int, db: Session = Depends(get_db)):
+def get_instrument_detail(
+    id: int, 
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
     inst = db.query(Instrument).options(
         joinedload(Instrument.institution),
         joinedload(Instrument.bank),
         selectinload(Instrument.provenance_fields),
-        selectinload(Instrument.documents),
+        selectinload(Instrument.documents).selectinload(Document.ocr_result),
         selectinload(Instrument.flags),
         selectinload(Instrument.verifications)
     ).filter(Instrument.id == id).first()
     if not inst:
         raise HTTPException(status_code=404, detail="Instrument not found")
+        
+    if current_user:
+        check_institution_access(current_user, inst.institution_id)
         
     simulated_now = get_simulated_now(db)
     days_to_mat = 0
@@ -151,7 +162,9 @@ def get_instrument_detail(id: int, db: Session = Depends(get_db)):
                 "kind": d.kind,
                 "sha256": d.sha256,
                 "storage_key": d.storage_key,
-                "created_at": d.created_at.strftime("%Y-%m-%d %H:%M")
+                "created_at": d.created_at.strftime("%Y-%m-%d %H:%M"),
+                "ocr_extracted": bool(d.ocr_result and d.ocr_result.fields),
+                "extracted_fields": d.ocr_result.fields if d.ocr_result else None
             } for d in inst.documents
         ],
         "flags": [
@@ -209,8 +222,12 @@ def create_instrument(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user)
 ):
+    target_institution_id = req.institution_id
+    if current_user and current_user.role == "institution_admin":
+        target_institution_id = current_user.institution_id or req.institution_id
+
     inst = Instrument(
-        institution_id=req.institution_id,
+        institution_id=target_institution_id,
         bank_id=req.bank_id,
         fdr_number=req.fdr_number.strip(),
         amount=req.amount,
@@ -253,7 +270,7 @@ def create_instrument(
     inst.risk_band = band
     db.commit()
     
-    actor_id = current_user.id if current_user else None
+    actor_id = current_user.id if current_user else 1
     actor_role = current_user.role if current_user else "institution_admin"
     log_audit_entry(db, "SUBMIT_FDR", "instrument", inst.id, {
         "fdr_number": inst.fdr_number,
@@ -263,19 +280,113 @@ def create_instrument(
     
     return {"success": True, "id": inst.id, "message": "FDR instrument successfully submitted"}
 
+@router.post("/{id}/renew")
+def renew_instrument(
+    id: int,
+    req: InstrumentCreate,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """
+    Submits a renewed / replacement FDR instrument, preserving complete parent-child lineage.
+    Mandated by AICTE PS 26265 Renewal & Replacement Monitoring.
+    """
+    parent = db.query(Instrument).filter(Instrument.id == id).first()
+    if not parent:
+        raise HTTPException(status_code=404, detail="Parent instrument not found")
+        
+    if current_user:
+        check_institution_access(current_user, parent.institution_id)
+        
+    if parent.status in [InstrumentStatusEnum.RENEWED.value, InstrumentStatusEnum.RELEASED.value]:
+        raise HTTPException(status_code=400, detail=f"Cannot renew an instrument that is already {parent.status}")
+        
+    child = Instrument(
+        institution_id=parent.institution_id,
+        bank_id=req.bank_id or parent.bank_id,
+        fdr_number=req.fdr_number.strip(),
+        amount=req.amount or parent.amount,
+        issue_date=req.issue_date,
+        maturity_date=req.maturity_date,
+        tenure_days=req.tenure_days,
+        interest_rate=req.interest_rate,
+        purpose=req.purpose or f"Renewal/Replacement of FDR #{parent.fdr_number}",
+        status=InstrumentStatusEnum.SUBMITTED.value,
+        trust_tier=TrustTierEnum.SELF_DECLARED.value,
+        parent_instrument_id=parent.id
+    )
+    db.add(child)
+    parent.status = InstrumentStatusEnum.RENEWED.value
+    db.commit()
+    db.refresh(child)
+    
+    # Initialize child provenance fields
+    fields = [
+        ("fdr_number", child.fdr_number),
+        ("amount", str(child.amount)),
+        ("issue_date", child.issue_date),
+        ("maturity_date", child.maturity_date),
+        ("interest_rate", str(child.interest_rate))
+    ]
+    for name, val in fields:
+        prov = FieldProvenance(
+            instrument_id=child.id,
+            field_name=name,
+            value=val,
+            source=ProvenanceSourceEnum.SELF_DECLARED.value,
+            confidence=1.0
+        )
+        db.add(prov)
+    db.commit()
+    
+    evaluate_instrument_rules(db, child)
+    risk, band, _ = compute_instrument_risk_score(db, child)
+    child.risk_score = risk
+    child.risk_band = band
+    db.commit()
+    
+    actor_id = current_user.id if current_user else 1
+    actor_role = current_user.role if current_user else "institution_admin"
+    log_audit_entry(db, "RENEW_INSTRUMENT", "instrument", child.id, {
+        "parent_instrument_id": parent.id,
+        "new_fdr_number": child.fdr_number,
+        "amount": child.amount,
+        "maturity_date": child.maturity_date
+    }, actor_id, actor_role)
+    
+    return {
+        "success": True,
+        "parent_id": parent.id,
+        "renewed_instrument_id": child.id,
+        "message": f"Instrument renewed successfully. Linked to parent FDR #{parent.fdr_number}."
+    }
+
 @router.post("/{id}/documents")
 async def upload_document(
     id: int,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    kind: str = Form("FDR_RECEIPT"),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
+    """
+    Uploads an original FDR receipt or supporting record.
+    Performs secure key generation, SHA-256 digesting, text/field extraction,
+    and automatic discrepancy checks against declared form data.
+    """
     inst = db.query(Instrument).filter(Instrument.id == id).first()
     if not inst:
         raise HTTPException(status_code=404, detail="Instrument not found")
         
-    filename = f"fdr_{inst.id}_{file.filename}"
+    if current_user:
+        check_institution_access(current_user, inst.institution_id)
+        
     doc_dir = os.path.join(settings.STORAGE_DIR, "documents")
-    save_path = os.path.join(doc_dir, filename)
+    os.makedirs(doc_dir, exist_ok=True)
+    
+    safe_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename or "receipt.pdf")
+    storage_key = f"doc_{inst.id}_{uuid.uuid4().hex[:10]}_{safe_name}"
+    save_path = os.path.join(doc_dir, storage_key)
     
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -285,32 +396,92 @@ async def upload_document(
     phash = None
     if save_path.lower().endswith(('.png', '.jpg', '.jpeg')):
         phash = compute_image_dhash(save_path)
-        ela_out = os.path.join(settings.STORAGE_DIR, "ela", f"ela_{filename}.jpg")
+        ela_dir = os.path.join(settings.STORAGE_DIR, "ela")
+        os.makedirs(ela_dir, exist_ok=True)
+        ela_out = os.path.join(ela_dir, f"ela_{storage_key}.jpg")
         perform_error_level_analysis(save_path, ela_out)
 
+    uploaded_by = current_user.id if current_user else None
     doc = Document(
         instrument_id=inst.id,
-        kind="FDR_RECEIPT",
-        storage_key=filename,
+        kind=kind,
+        storage_key=storage_key,
         sha256=sha256,
         phash=phash,
-        mime=file.content_type or "application/pdf"
+        mime=file.content_type or "application/pdf",
+        uploaded_by=uploaded_by
     )
     db.add(doc)
     db.commit()
+    db.refresh(doc)
     
+    # Execute Document Text & Field Extraction
+    extraction = extract_from_document(save_path)
+    
+    ocr = OcrResult(
+        document_id=doc.id,
+        raw_text=extraction.get("raw_text", ""),
+        fields=extraction.get("fields", {}),
+        engine=extraction.get("engine", "pypdf+regex_v2")
+    )
+    db.add(ocr)
+    
+    # Provenance Upgrade to DOC_EXTRACTED
+    extracted_fields = extraction.get("fields", {})
+    if extraction.get("success"):
+        for prov in inst.provenance_fields:
+            if prov.field_name in extracted_fields and extracted_fields[prov.field_name] is not None:
+                prov.source = ProvenanceSourceEnum.OCR_EXTRACTED.value
+                prov.confidence = extraction.get("field_confidence", {}).get(prov.field_name, 0.90)
+        if inst.trust_tier == TrustTierEnum.SELF_DECLARED.value:
+            inst.trust_tier = TrustTierEnum.DOC_EXTRACTED.value
+
+    # Reconcile Form vs Document Data -> Flag Discrepancies
+    if extracted_fields.get("amount") is not None:
+        doc_amt = float(extracted_fields["amount"])
+        if abs(doc_amt - inst.amount) > 1.0:
+            f = Flag(
+                instrument_id=inst.id,
+                code="FORM_DOC_AMOUNT_DISCREPANCY",
+                severity="HIGH",
+                explanation=f"Amount Discrepancy: Pledging institution declared Rs {inst.amount:,.2f}, but uploaded bank receipt shows Rs {doc_amt:,.2f}.",
+                evidence={"form_amount": inst.amount, "extracted_amount": doc_amt, "document_id": doc.id},
+                status="open",
+                raised_by="system"
+            )
+            db.add(f)
+            inst.status = InstrumentStatusEnum.FLAGGED.value
+
+    if extracted_fields.get("fdr_number") is not None:
+        clean_ext = re.sub(r'[^A-Za-z0-9]', '', str(extracted_fields["fdr_number"])).upper()
+        clean_dec = re.sub(r'[^A-Za-z0-9]', '', inst.fdr_number).upper()
+        if clean_ext and clean_dec and clean_ext != clean_dec:
+            f = Flag(
+                instrument_id=inst.id,
+                code="FORM_DOC_SERIAL_MISMATCH",
+                severity="HIGH",
+                explanation=f"FDR Serial Mismatch: Form serial '{inst.fdr_number}' does not match document serial '{extracted_fields['fdr_number']}'.",
+                evidence={"form_fdr": inst.fdr_number, "extracted_fdr": extracted_fields["fdr_number"], "document_id": doc.id},
+                status="open",
+                raised_by="system"
+            )
+            db.add(f)
+            inst.status = InstrumentStatusEnum.FLAGGED.value
+
+    # Metadata Check
     meta = inspect_pdf_metadata(save_path)
     if meta.get("is_suspicious"):
         f = Flag(
             instrument_id=inst.id,
             code="FORENSIC_UNAUTHORIZED_EDITOR",
             severity="HIGH",
-            explanation=meta["explanation"],
+            explanation=meta.get("explanation", "Suspicious editor tool used"),
             evidence=meta,
             status="open",
             raised_by="system"
         )
         db.add(f)
+        inst.status = InstrumentStatusEnum.FLAGGED.value
         
     evaluate_instrument_rules(db, inst)
     risk, band, _ = compute_instrument_risk_score(db, inst)
@@ -318,13 +489,53 @@ async def upload_document(
     inst.risk_band = band
     db.commit()
     
+    actor_id = current_user.id if current_user else 1
+    actor_role = current_user.role if current_user else "institution_admin"
     log_audit_entry(db, "UPLOAD_DOCUMENT", "document", doc.id, {
         "instrument_id": inst.id,
-        "filename": filename,
-        "sha256": sha256
-    })
+        "storage_key": storage_key,
+        "sha256": sha256,
+        "extracted_fields": extracted_fields
+    }, actor_id, actor_role)
     
-    return {"success": True, "document_id": doc.id, "sha256": sha256}
+    return {
+        "success": True, 
+        "document_id": doc.id, 
+        "sha256": sha256,
+        "storage_key": storage_key,
+        "extracted_fields": extracted_fields,
+        "ocr_extracted": extraction.get("success", False),
+        "extraction_success": extraction.get("success", False)
+    }
+
+@router.get("/{id}/documents/{doc_id}/download")
+def download_document(
+    id: int,
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """Secure, authorized download endpoint for uploaded institutional documents."""
+    inst = db.query(Instrument).filter(Instrument.id == id).first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="Instrument not found")
+        
+    if current_user:
+        check_institution_access(current_user, inst.institution_id)
+        
+    doc = db.query(Document).filter(Document.id == doc_id, Document.instrument_id == inst.id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    doc_path = os.path.join(settings.STORAGE_DIR, "documents", doc.storage_key)
+    if not os.path.exists(doc_path):
+        raise HTTPException(status_code=404, detail="Document file not found on disk")
+        
+    return FileResponse(
+        path=doc_path,
+        media_type=doc.mime or "application/octet-stream",
+        filename=doc.storage_key
+    )
 
 @router.post("/{id}/observations")
 async def add_observation(
@@ -368,5 +579,5 @@ async def add_observation(
         "instrument_id": inst.id,
         "author_id": author_id,
         "text": str(text_val).strip()[:100]
-    })
+    }, author_id, current_user.role if current_user else "officer")
     return {"success": True, "id": obs.id}

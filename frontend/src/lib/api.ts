@@ -1,11 +1,58 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
 
+const TOKEN_KEY = "prama_auth_token";
+const USER_KEY = "prama_auth_user";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function getCurrentUser(): any | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthSession(token: string | null, user: any | null = null): void {
+  if (typeof window === "undefined") return;
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+    if (user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+    }
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  }
+  window.dispatchEvent(new Event("authChanged"));
+}
+
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
-  const headers = {
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-  };
+  const token = getAuthToken();
+
+  const headers: Record<string, string> = {};
+
+  // Only set Content-Type to JSON if not uploading FormData
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  // Merge any custom headers
+  if (options.headers) {
+    const customHeaders = options.headers as Record<string, string>;
+    Object.assign(headers, customHeaders);
+  }
 
   const res = await fetch(url, { ...options, headers });
   if (!res.ok) {

@@ -83,21 +83,32 @@ def advance_simulated_clock(db: Session, days: int) -> Dict[str, Any]:
                 ).first()
                 
                 if not existing:
+                    recipient_email = f"{rule.recipient_role}@aicte.gov.in"
                     rem = Reminder(
                         instrument_id=inst.id,
                         rule_id=rule.id,
                         due_at=simulated_now,
                         sent_at=simulated_now,
-                        channel=rule.channel,
+                        channel=f"{rule.channel} (Mock Dispatcher)",
                         level=rule.level,
-                        status="SENT",
-                        recipient=rule.recipient_role,
-                        message=f"Urgent: FDR {inst.fdr_number} matures in {days_to_maturity} days ({inst.maturity_date}). Level {rule.level} regulatory action required."
+                        status="DELIVERED (SIMULATED)",
+                        recipient=recipient_email,
+                        message=f"Urgent Regulatory Notice: Institutional FDR {inst.fdr_number} matures in {days_to_maturity} days ({inst.maturity_date}). Level {rule.level} regulatory action required."
                     )
                     db.add(rem)
                     reminders_created += 1
                     if rule.level >= 2:
                         escalations_created += 1
+                    
+                    log_audit_entry(db, "DISPATCH_NOTIFICATION", "reminder", inst.id, {
+                        "instrument_id": inst.id,
+                        "rule_id": rule.id,
+                        "channel": rule.channel,
+                        "recipient": recipient_email,
+                        "level": rule.level,
+                        "status": "DELIVERED (SIMULATED)",
+                        "simulated_date": simulated_now.strftime("%Y-%m-%d")
+                    })
 
     db.commit()
     

@@ -124,6 +124,29 @@ def evaluate_instrument_rules(db: Session, instrument: Instrument, ocr_data: Opt
                     "conflicting_institution": conflicting_inst.name if conflicting_inst else None
                 }
             })
+
+        # Check 3: Perceptual hash similarity (near-duplicate scanned documents)
+        if doc.phash and doc.phash != ("0" * 16):
+            other_docs = db.query(Document).join(Instrument).filter(
+                Document.phash.isnot(None),
+                Document.id != doc.id,
+                Instrument.institution_id != instrument.institution_id
+            ).limit(50).all()
+            for other in other_docs:
+                if other.phash and other.phash != ("0" * 16):
+                    dist = hamming_distance(doc.phash, other.phash)
+                    if dist <= 5:
+                        conflicting_inst = db.query(Institution).filter(Institution.id == other.instrument.institution_id).first()
+                        new_flags.append({
+                            "code": "R08_PERCEPTUAL_NEAR_DUPLICATE_DOCUMENT",
+                            "severity": FlagSeverityEnum.CRITICAL.value,
+                            "explanation": f"CRITICAL: Visual layout of document strongly matches an instrument uploaded by '{conflicting_inst.name if conflicting_inst else 'Another Institute'}' (Hamming Distance: {dist}/64). Potential counterfeit template reuse.",
+                            "evidence": {
+                                "distance": dist,
+                                "conflicting_institution": conflicting_inst.name if conflicting_inst else None
+                            }
+                        })
+                        break
             
     # Save newly generated flags to DB
     for flag_data in new_flags:

@@ -61,10 +61,11 @@ def log_audit_entry(
     db.refresh(entry)
     return entry
 
-def verify_audit_chain(db: Session, force_recompute: bool = False) -> Dict[str, Any]:
+def verify_audit_chain(db: Session, force_recompute: bool = True) -> Dict[str, Any]:
     """
     Verifies the cryptographic integrity of the entire audit chain.
-    Uses cached result if chain state (latest ID and latest hash) has not mutated.
+    Always verifies every block sequentially from Genesis to prevent
+    unnoticed out-of-band database mutations in middle rows.
     """
     latest = db.query(AuditLog).order_by(AuditLog.id.desc()).first()
     if not latest:
@@ -73,10 +74,6 @@ def verify_audit_chain(db: Session, force_recompute: bool = False) -> Dict[str, 
             "total_entries": 0,
             "message": "Audit chain empty. Genesis state valid."
         }
-        
-    if not force_recompute and _AUDIT_CACHE["result"] is not None:
-        if _AUDIT_CACHE["latest_id"] == latest.id and _AUDIT_CACHE["latest_hash"] == latest.hash:
-            return _AUDIT_CACHE["result"]
 
     entries = db.query(AuditLog).order_by(AuditLog.id.asc()).all()
     
@@ -110,7 +107,4 @@ def verify_audit_chain(db: Session, force_recompute: bool = False) -> Dict[str, 
         "latest_hash": expected_prev_hash,
         "message": f"Cryptographic integrity verified: all {len(entries)} audit blocks strictly untampered."
     }
-    _AUDIT_CACHE["latest_id"] = latest.id
-    _AUDIT_CACHE["latest_hash"] = latest.hash
-    _AUDIT_CACHE["result"] = result
     return result

@@ -9,7 +9,8 @@ import {
   Layers, QrCode, FileText, Eye, ShieldAlert,
   ArrowLeft, Sparkles, Building2, Landmark,
   Clock, HelpCircle, RefreshCw, FileCheck2, X,
-  Scan, Crosshair, ZoomIn, Info, Check, AlertOctagon, Sliders
+  Scan, Crosshair, ZoomIn, Info, Check, AlertOctagon, Sliders,
+  Download, Upload, GitBranch, ExternalLink
 } from "lucide-react";
 import { fetchApi, API_BASE } from "@/lib/api";
 
@@ -62,6 +63,28 @@ interface ForensicData {
   };
 }
 
+interface DocumentItem {
+  id: number;
+  kind: string;
+  sha256: string;
+  storage_key: string;
+  created_at: string;
+  ocr_extracted: boolean;
+  extracted_fields?: any;
+}
+
+interface ReleaseReadiness {
+  is_ready: boolean;
+  policy_source: string;
+  checklist: Array<{
+    code: string;
+    title: string;
+    status: "SATISFIED" | "BLOCKED";
+    detail: string;
+  }>;
+  blockers: string[];
+}
+
 interface InstrumentDetail {
   id: number;
   institution_id: number;
@@ -83,6 +106,7 @@ interface InstrumentDetail {
   risk_band: string;
   days_to_maturity: number;
   parent_instrument_id?: number;
+  documents?: DocumentItem[];
   provenance: Record<string, { value: string; source: string; confidence: number; updated_at: string }>;
   flags: Array<{ id: number; code: string; severity: string; explanation: string; explanation_hi?: string; evidence: any; status: string; created_at: string }>;
   verifications: Array<{ id: number; method: string; result: string; created_at: string }>;
@@ -122,6 +146,23 @@ export default function DepositInspectorPage() {
   const [releaseReason, setReleaseReason] = useState<string>("10-Year Statutory Term Completion - Request for Release & Security Refund");
   const [submittingRelease, setSubmittingRelease] = useState<boolean>(false);
   const [releaseResult, setReleaseResult] = useState<{ success: boolean; message: string; reqId?: number } | null>(null);
+  const [readiness, setReadiness] = useState<ReleaseReadiness | null>(null);
+  const [loadingReadiness, setLoadingReadiness] = useState<boolean>(false);
+
+  // Renewal / Replacement States
+  const [renewalModalOpen, setRenewalModalOpen] = useState<boolean>(false);
+  const [submittingRenewal, setSubmittingRenewal] = useState<boolean>(false);
+  const [renewalFdrNumber, setRenewalFdrNumber] = useState<string>("");
+  const [renewalAmount, setRenewalAmount] = useState<number>(0);
+  const [renewalMaturityDate, setRenewalMaturityDate] = useState<string>("");
+  const [renewalInterestRate, setRenewalInterestRate] = useState<number>(7.25);
+  const [renewalReason, setRenewalReason] = useState<string>("Statutory 5-Year Renewal under AICTE Regulations");
+  const [renewalResult, setRenewalResult] = useState<{ success: boolean; message: string; childId?: number } | null>(null);
+
+  // Document upload state
+  const [uploadingDoc, setUploadingDoc] = useState<boolean>(false);
+  const [uploadResult, setUploadResult] = useState<{ success: boolean; message: string } | null>(null);
+
   const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
@@ -275,6 +316,104 @@ export default function DepositInspectorPage() {
     }
   };
 
+  const loadReadiness = async () => {
+    try {
+      setLoadingReadiness(true);
+      const data = await fetchApi<ReleaseReadiness>(`/instruments/${id}/release-readiness`);
+      setReadiness(data);
+    } catch (e) {
+      console.error("Failed to load release readiness:", e);
+    } finally {
+      setLoadingReadiness(false);
+    }
+  };
+
+  const handleOpenReleaseModal = () => {
+    setReleaseModalOpen(true);
+    setReleaseResult(null);
+    loadReadiness();
+  };
+
+  const handleOpenRenewalModal = () => {
+    if (detail) {
+      setRenewalFdrNumber(`${detail.fdr_number}-RN1`);
+      setRenewalAmount(detail.amount);
+      const nextMat = new Date();
+      nextMat.setFullYear(nextMat.getFullYear() + 5);
+      setRenewalMaturityDate(nextMat.toISOString().split("T")[0]);
+      setRenewalInterestRate(detail.interest_rate || 7.25);
+    }
+    setRenewalModalOpen(true);
+    setRenewalResult(null);
+  };
+
+  const handleRenewInstrument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detail) return;
+    setSubmittingRenewal(true);
+    setRenewalResult(null);
+    try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const res = await fetchApi<any>(`/instruments/${detail.id}/renew`, {
+        method: "POST",
+        body: JSON.stringify({
+          institution_id: detail.institution_id,
+          bank_id: detail.bank_id,
+          fdr_number: renewalFdrNumber,
+          amount: Number(renewalAmount),
+          issue_date: todayStr,
+          maturity_date: renewalMaturityDate,
+          tenure_days: Math.round((new Date(renewalMaturityDate).getTime() - new Date(todayStr).getTime()) / (1000 * 60 * 60 * 24)),
+          interest_rate: Number(renewalInterestRate),
+          purpose: renewalReason
+        })
+      });
+      setRenewalResult({
+        success: true,
+        message: res.message || "FDR successfully renewed and linked to parent instrument.",
+        childId: res.renewed_instrument_id
+      });
+      await loadDetail();
+    } catch (e: any) {
+      setRenewalResult({
+        success: false,
+        message: e.message || "Failed to renew instrument."
+      });
+    } finally {
+      setSubmittingRenewal(false);
+    }
+  };
+
+  const handleUploadAdditionalDoc = async (e: React.ChangeEvent<HTMLInputElement>, kind: string) => {
+    const file = e.target.files?.[0];
+    if (!file || !detail) return;
+    setUploadingDoc(true);
+    setUploadResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kind", kind);
+
+      await fetchApi(`/instruments/${detail.id}/documents`, {
+        method: "POST",
+        body: formData
+      });
+
+      setUploadResult({
+        success: true,
+        message: `Uploaded ${file.name}. Extraction & discrepancy analysis complete.`
+      });
+      await loadDetail();
+    } catch (err: any) {
+      setUploadResult({
+        success: false,
+        message: err.message || "Upload failed."
+      });
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
   if (loading || !detail) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -303,6 +442,20 @@ export default function DepositInspectorPage() {
               <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-mono">
                 {detail.fdr_number}
               </h1>
+              {detail.parent_instrument_id && (
+                <Link
+                  href={`/inspector/${detail.parent_instrument_id}`}
+                  className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/30 flex items-center gap-1 hover:underline"
+                >
+                  <GitBranch className="w-3 h-3" />
+                  <span>Renewed from FDR #{detail.parent_instrument_id}</span>
+                </Link>
+              )}
+              {detail.status === "renewed" && (
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/30">
+                  REPLACED / RENEWED
+                </span>
+              )}
               <span className={`px-2.5 py-0.5 rounded text-xs font-semibold border ${
                 detail.trust_tier === "BANK_CONFIRMED" 
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30" 
@@ -437,6 +590,100 @@ export default function DepositInspectorPage() {
                   <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Account Pledging</span>
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Joint Name Verified</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Uploaded Documents & Extraction Evidence */}
+            <div className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-800 dark:text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-blue-500" />
+                  Uploaded Documents & Automated Extraction Evidence
+                </h3>
+                <label className="cursor-pointer px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-semibold text-[11px] border border-slate-200 dark:border-zinc-700 transition flex items-center gap-1 shadow-sm">
+                  <Upload className="w-3 h-3" />
+                  <span>Upload Document</span>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    onChange={(e) => handleUploadAdditionalDoc(e, "AFFIDAVIT_6")}
+                    disabled={uploadingDoc}
+                  />
+                </label>
+              </div>
+
+              {uploadResult && (
+                <div className={`p-2.5 rounded-lg text-xs border ${
+                  uploadResult.success 
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300"
+                    : "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300"
+                }`}>
+                  {uploadResult.message}
+                </div>
+              )}
+
+              {uploadingDoc && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Extracting document text & running field reconciliation...</span>
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                {(!detail.documents || detail.documents.length === 0) ? (
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 italic">No document files uploaded yet.</p>
+                ) : (
+                  detail.documents.map((doc) => (
+                    <div key={doc.id} className="p-3 rounded-lg bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-900 dark:text-white font-mono text-[11px] bg-slate-200 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                            {doc.kind}
+                          </span>
+                          <span className="text-slate-500 dark:text-zinc-400 truncate max-w-[200px]" title={doc.storage_key}>
+                            {doc.storage_key}
+                          </span>
+                        </div>
+                        <a
+                          href={`${API_BASE}/instruments/${detail.id}/documents/${doc.id}/download`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 bg-white hover:bg-slate-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded text-[11px] font-semibold transition flex items-center gap-1 shadow-sm"
+                        >
+                          <Download className="w-3 h-3 text-blue-500" />
+                          <span>Download</span>
+                        </a>
+                      </div>
+
+                      <div className="text-[10.5px] font-mono text-slate-500 dark:text-zinc-400 truncate">
+                        SHA-256: {doc.sha256}
+                      </div>
+
+                      {doc.extracted_fields && Object.keys(doc.extracted_fields).length > 0 && (
+                        <div className="p-2 rounded bg-white/70 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800 text-[11px] space-y-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 block">
+                            Automated Document Extraction (pypdf Engine):
+                          </span>
+                          <div className="grid grid-cols-2 gap-1.5 font-mono text-[10.5px]">
+                            {doc.extracted_fields.fdr_number && (
+                              <div><span className="text-slate-500">FDR:</span> <span className="font-semibold">{doc.extracted_fields.fdr_number}</span></div>
+                            )}
+                            {doc.extracted_fields.amount && (
+                              <div><span className="text-slate-500">Amount:</span> <span className="font-semibold">₹{Number(doc.extracted_fields.amount).toLocaleString("en-IN")}</span></div>
+                            )}
+                            {doc.extracted_fields.maturity_date && (
+                              <div><span className="text-slate-500">Maturity:</span> <span className="font-semibold">{doc.extracted_fields.maturity_date}</span></div>
+                            )}
+                            {doc.extracted_fields.lien_clause !== undefined && (
+                              <div><span className="text-slate-500">AICTE Lien:</span> <span className={doc.extracted_fields.lien_clause ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold"}>{doc.extracted_fields.lien_clause ? "Verified" : "Missing"}</span></div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -602,13 +849,27 @@ export default function DepositInspectorPage() {
                   </Link>
                 </div>
               ) : (
-                <button
-                  onClick={() => setReleaseModalOpen(true)}
-                  className="w-full p-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition shadow-sm flex items-center justify-center gap-1.5"
-                >
-                  <FileCheck2 className="w-4 h-4" />
-                  <span>Initiate Deposit Release Request</span>
-                </button>
+                <div className="space-y-2 pt-1">
+                  <button
+                    onClick={handleOpenReleaseModal}
+                    className="w-full p-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <FileCheck2 className="w-4 h-4" />
+                    <span>Initiate Deposit Release Request</span>
+                  </button>
+                </div>
+              )}
+
+              {detail.status !== "renewed" && (
+                <div className="pt-2 border-t border-slate-200 dark:border-zinc-800">
+                  <button
+                    onClick={handleOpenRenewalModal}
+                    className="w-full p-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-semibold text-xs border border-slate-200 dark:border-zinc-700 transition shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <GitBranch className="w-4 h-4 text-purple-600" />
+                    <span>Submit Renewal / Replacement FDR</span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1163,6 +1424,54 @@ export default function DepositInspectorPage() {
               Once requested, this deposit will enter the Scrutiny Officer (Maker) review queue. After compliance check, the Senior Director (Checker) must authorize before funds are discharged.
             </div>
 
+            {/* AICTE Clause 6.46 Release-Readiness Engine Live Checklist */}
+            <div className="p-3.5 bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[11px] uppercase tracking-wider text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                  AICTE Clause 6.46 Statutory Pre-requisite Audit
+                </span>
+                {loadingReadiness ? (
+                  <span className="text-[10.5px] text-slate-500 flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 animate-spin text-purple-500" />
+                    Checking policy...
+                  </span>
+                ) : readiness?.is_ready ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30">
+                    ALL CONDITIONS SATISFIED
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30">
+                    {readiness?.blockers.length || 0} POLICY BLOCKER(S)
+                  </span>
+                )}
+              </div>
+
+              {readiness && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto text-[11px]">
+                  {readiness.checklist.map((item) => (
+                    <div key={item.code} className="flex items-start gap-2 p-1.5 rounded bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800">
+                      {item.status === "SATISFIED" ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1">
+                        <div className="font-semibold text-slate-800 dark:text-zinc-200">{item.title}</div>
+                        <div className="text-[10.5px] text-slate-500 dark:text-zinc-400">{item.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {readiness && !readiness.is_ready && (
+                <div className="p-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-lg text-[11px] text-rose-800 dark:text-rose-300">
+                  <strong>Notice:</strong> This deposit has unfulfilled statutory prerequisites under APH Clause 6.46. Submitting will flag explicit compliance blockers to the Maker review desk.
+                </div>
+              )}
+            </div>
+
             <form onSubmit={handleRequestRelease} className="space-y-4 text-xs">
               <div>
                 <label className="text-slate-700 dark:text-zinc-300 font-semibold block mb-1">
@@ -1222,6 +1531,152 @@ export default function DepositInspectorPage() {
                     <>
                       <FileCheck2 className="w-3.5 h-3.5" />
                       <span>Submit Release Order</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Renewal / Replacement FDR Modal */}
+      {renewalModalOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
+                  <GitBranch className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Submit Renewal / Replacement FDR</h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono">Parent FDR #{detail.fdr_number} • {detail.institution_name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRenewalModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/40 rounded-xl text-xs text-indigo-900 dark:text-indigo-300">
+              <span className="font-bold block mb-1">AICTE PS 26265 Lineage Tracking:</span>
+              Submitting a renewal creates an updated child instrument while preserving the complete 10-year audit history of the parent deposit.
+            </div>
+
+            {renewalResult && (
+              <div className={`p-3 rounded-lg text-xs border ${
+                renewalResult.success
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300"
+                  : "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300"
+              }`}>
+                <div className="font-semibold">{renewalResult.message}</div>
+                {renewalResult.childId && (
+                  <Link
+                    href={`/inspector/${renewalResult.childId}`}
+                    onClick={() => setRenewalModalOpen(false)}
+                    className="mt-2 inline-flex items-center gap-1 font-bold text-indigo-700 dark:text-indigo-400 underline"
+                  >
+                    Open New Child Instrument #{renewalResult.childId} &rarr;
+                  </Link>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleRenewInstrument} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-700 dark:text-zinc-300 font-semibold block mb-1">
+                    New FDR Number / Serial
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={renewalFdrNumber}
+                    onChange={(e) => setRenewalFdrNumber(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg p-2 font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-700 dark:text-zinc-300 font-semibold block mb-1">
+                    Corpus Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={renewalAmount}
+                    onChange={(e) => setRenewalAmount(Number(e.target.value))}
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg p-2 font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-700 dark:text-zinc-300 font-semibold block mb-1">
+                    New Maturity Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={renewalMaturityDate}
+                    onChange={(e) => setRenewalMaturityDate(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg p-2 font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-700 dark:text-zinc-300 font-semibold block mb-1">
+                    Interest Rate (% p.a.)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={renewalInterestRate}
+                    onChange={(e) => setRenewalInterestRate(Number(e.target.value))}
+                    className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg p-2 font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-slate-700 dark:text-zinc-300 font-semibold block mb-1">
+                  Renewal Ground / Notes
+                </label>
+                <input
+                  type="text"
+                  value={renewalReason}
+                  onChange={(e) => setRenewalReason(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 rounded-lg p-2 text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500 shadow-sm"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setRenewalModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700 font-medium transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingRenewal}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {submittingRenewal ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <GitBranch className="w-3.5 h-3.5" />
+                      <span>Create Renewal Record</span>
                     </>
                   )}
                 </button>

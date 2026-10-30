@@ -8,7 +8,7 @@ from backend.app.models import entities  # Ensure models are loaded
 from backend.app.api import (
     auth, instruments, verification, release,
     dashboard, graph, audit, demo, mock_bank, evaluation,
-    slm, knowledge_api, copilot
+    slm, knowledge_api, copilot, reports
 )
 
 # Auto-create tables if they don't exist
@@ -21,9 +21,16 @@ app = FastAPI(
 )
 
 # Configure CORS
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,6 +53,7 @@ app.include_router(evaluation.router, prefix=settings.API_V1_PREFIX)
 app.include_router(slm.router, prefix=settings.API_V1_PREFIX)
 app.include_router(knowledge_api.router, prefix=settings.API_V1_PREFIX)
 app.include_router(copilot.router, prefix=settings.API_V1_PREFIX)
+app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/health")
 def health_check():

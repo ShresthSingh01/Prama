@@ -9,11 +9,18 @@ import {
   Lock, CheckCircle2, XCircle, BookOpen, Sparkles, Sun, Moon,
   HelpCircle
 } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { fetchApi, setAuthSession, getCurrentUser, getAuthToken } from "@/lib/api";
 import { useTheme } from "./ThemeProvider";
 import CopilotPanel from "./CopilotPanel";
 import WalkthroughModal from "./WalkthroughModal";
 import PramaLogo from "./PramaLogo";
+
+const ROLE_CREDENTIALS: Record<string, { email: string; name: string }> = {
+  maker: { email: "maker@aicte.gov.in", name: "Scrutiny Officer" },
+  checker: { email: "checker@aicte.gov.in", name: "Senior Director" },
+  institute: { email: "institute1@iit.ac.in", name: "NIT Pune (Inst)" },
+  admin: { email: "admin@aicte.gov.in", name: "Bureau Admin" },
+};
 
 export default function Navigation() {
   const pathname = usePathname();
@@ -26,9 +33,28 @@ export default function Navigation() {
   const [auditValid, setAuditValid] = useState<boolean>(true);
   const [advancing, setAdvancing] = useState<boolean>(false);
   const [activeRole, setActiveRole] = useState<string>("maker");
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [copilotOpen, setCopilotOpen] = useState<boolean>(false);
   const [copilotQuestion, setCopilotQuestion] = useState<string>("");
   const [walkthroughOpen, setWalkthroughOpen] = useState<boolean>(false);
+
+  const loginAsRole = async (roleKey: string) => {
+    const creds = ROLE_CREDENTIALS[roleKey];
+    if (!creds) return;
+    try {
+      const res = await fetchApi<{ access_token: string; user: any }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: creds.email, password: "Password@123" })
+      });
+      setAuthSession(res.access_token, res.user);
+      setCurrentUser(res.user);
+      setActiveRole(roleKey);
+      window.dispatchEvent(new Event("clockUpdated"));
+      window.dispatchEvent(new Event("authChanged"));
+    } catch (e) {
+      console.error("Auto-login failed:", e);
+    }
+  };
 
   const refreshClock = async () => {
     try {
@@ -47,6 +73,16 @@ export default function Navigation() {
   };
 
   useEffect(() => {
+    const user = getCurrentUser();
+    if (!user || !getAuthToken()) {
+      loginAsRole("maker");
+    } else {
+      setCurrentUser(user);
+      if (user.role === "institution_admin") setActiveRole("institute");
+      else if (user.role === "senior_officer") setActiveRole("checker");
+      else if (user.role === "admin") setActiveRole("admin");
+      else setActiveRole("maker");
+    }
     refreshClock();
     refreshAudit();
     const interval = setInterval(refreshClock, 10000);
@@ -198,19 +234,24 @@ export default function Navigation() {
             )}
           </Link>
 
-          {/* User Role */}
+          {/* User Persona Switcher */}
           <div className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400">
-            <span className="text-[11px]">Role:</span>
+            <span className="text-[11px] hidden sm:inline">Active Persona:</span>
             <select 
               value={activeRole} 
-              onChange={(e) => setActiveRole(e.target.value)}
-              className="bg-white dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded px-2 py-0.5 text-xs focus:outline-none shadow-sm"
+              onChange={(e) => loginAsRole(e.target.value)}
+              className="bg-white dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded px-2 py-0.5 text-xs focus:outline-none shadow-sm font-medium"
             >
-              <option value="maker">Scrutiny Officer (Reviewer)</option>
-              <option value="checker">Senior Director (Approver)</option>
-              <option value="institute">Institution Registrar</option>
+              <option value="maker">Scrutiny Officer (Maker)</option>
+              <option value="checker">Senior Director (Checker)</option>
+              <option value="institute">Institution Admin (NIT Pune)</option>
               <option value="admin">System Administrator</option>
             </select>
+            {currentUser?.name && (
+              <span className="hidden md:inline-block px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-semibold border border-amber-500/20">
+                {currentUser.name}
+              </span>
+            )}
           </div>
 
           {/* Light / Dark Mode Toggle Button */}

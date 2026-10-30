@@ -5,9 +5,9 @@ import Link from "next/link";
 import { 
   ListFilter, Search, AlertTriangle, 
   ChevronRight, ChevronLeft,
-  Sparkles, X
+  Sparkles, X, Download, FileSpreadsheet, ChevronDown
 } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { fetchApi, API_BASE } from "@/lib/api";
 
 interface InstrumentRow {
   id: number;
@@ -39,6 +39,7 @@ export default function QueuePage() {
   const [selectedTier, setSelectedTier] = useState<string>("ALL");
   const [selectedRisk, setSelectedRisk] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [reportsDropdownOpen, setReportsDropdownOpen] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
   const pageSize = 25;
 
@@ -120,6 +121,76 @@ export default function QueuePage() {
           <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700">
             {instruments.length} Deposits Found
           </span>
+
+          <div className="relative">
+            <button
+              onClick={() => setReportsDropdownOpen(!reportsDropdownOpen)}
+              className="px-3 py-1 rounded-md bg-white hover:bg-slate-50 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 font-semibold transition flex items-center gap-1.5 shadow-sm"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Export Statutory Reports</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {reportsDropdownOpen && (
+              <div 
+                className="absolute right-0 mt-1 w-64 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1.5 space-y-1 animate-in fade-in"
+                onMouseLeave={() => setReportsDropdownOpen(false)}
+              >
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
+                  AICTE PS 26265 Mandated Reports
+                </div>
+
+                <a
+                  href={`${API_BASE}/reports/pending-verifications?format=csv`}
+                  download="Pending_Verifications_Report.csv"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Pending Bank Verifications</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">CSV</span>
+                </a>
+
+                <a
+                  href={`${API_BASE}/reports/upcoming-maturities?format=csv`}
+                  download="Upcoming_Maturities_Report.csv"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Upcoming Maturities (&lt;90d)</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">CSV</span>
+                </a>
+
+                <a
+                  href={`${API_BASE}/reports/missing-documents?format=csv`}
+                  download="Missing_Documents_Report.csv"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Missing Receipt Documents</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">CSV</span>
+                </a>
+
+                <a
+                  href={`${API_BASE}/reports/intervention-cases?format=csv`}
+                  download="Intervention_Cases_Report.csv"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download className="w-3.5 h-3.5 text-purple-500" />
+                    <span>Regulatory Intervention Cases</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">CSV</span>
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

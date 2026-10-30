@@ -20,7 +20,7 @@ def list_banks(db: Session = Depends(get_db)):
     ]
 
 @router.post("/issue-sample-fdr")
-def issue_sample_fdr(bank_id: int, fdr_number: str, amount: float, maturity_date: str, holder_name: str, db: Session = Depends(get_db)):
+def issue_sample_fdr(bank_id: int, fdr_number: str, amount: float, maturity_date: str, holder_name: str, issue_date: str = "2026-01-15", db: Session = Depends(get_db)):
     bank = db.query(Bank).filter(Bank.id == bank_id).first()
     if not bank or not bank.private_key:
         raise HTTPException(status_code=404, detail="Bank not found or private key unavailable")
@@ -30,7 +30,7 @@ def issue_sample_fdr(bank_id: int, fdr_number: str, amount: float, maturity_date
         bank_ifsc=bank.ifsc_prefix,
         fdr_number=fdr_number,
         amount=amount,
-        issue_date="2026-01-15",
+        issue_date=issue_date,
         maturity_date=maturity_date,
         holder_name=holder_name
     )
@@ -43,7 +43,7 @@ def issue_sample_fdr(bank_id: int, fdr_number: str, amount: float, maturity_date
     }
 
 @router.post("/issue-tampered-sample-fdr")
-def issue_tampered_sample_fdr(bank_id: int, fdr_number: str, amount: float, maturity_date: str, holder_name: str, db: Session = Depends(get_db)):
+def issue_tampered_sample_fdr(bank_id: int, fdr_number: str, amount: float, maturity_date: str, holder_name: str, issue_date: str = "2026-01-15", db: Session = Depends(get_db)):
     """
     Generates a valid bank signature on Rs 5,00,000, then maliciously modifies
     the envelope amount to Rs 50,00,000 to demonstrate signature validation failure!
@@ -58,7 +58,7 @@ def issue_tampered_sample_fdr(bank_id: int, fdr_number: str, amount: float, matu
         bank_ifsc=bank.ifsc_prefix,
         fdr_number=fdr_number,
         amount=500000.0,
-        issue_date="2026-01-15",
+        issue_date=issue_date,
         maturity_date=maturity_date,
         holder_name=holder_name
     )

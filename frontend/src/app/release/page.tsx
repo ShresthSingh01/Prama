@@ -4,9 +4,9 @@ import React, { useState, useEffect } from "react";
 import { 
   FileCheck2, ShieldCheck, CheckCircle2,
   AlertTriangle, QrCode, Lock, UserCheck,
-  Sparkles, RefreshCw, ArrowRight
+  Sparkles, RefreshCw, ArrowRight, Download, FileText
 } from "lucide-react";
-import { fetchApi } from "@/lib/api";
+import { fetchApi, API_BASE } from "@/lib/api";
 
 interface ReleaseRequestItem {
   id: number;
@@ -388,7 +388,7 @@ export default function ReleasePortalPage() {
                 )}
 
                 {selectedReq.status === "released" && (
-                  <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/40 rounded-xl space-y-2 text-xs">
+                  <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/40 rounded-xl space-y-3 text-xs">
                     <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400 font-bold text-sm">
                       <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                       <span>OFFICIAL AICTE RELEASE CERTIFICATE ISSUED</span>
@@ -401,8 +401,24 @@ export default function ReleasePortalPage() {
                         <QrCode className="w-10 h-10 text-slate-900" />
                       </div>
                       <div className="text-xs text-slate-600 dark:text-zinc-400">
-                        Cryptographically signed release token generated. Bank security deposit successfully discharged.
+                        Cryptographically signed release token generated. Bank security deposit successfully discharged under dual-officer sign-off.
                       </div>
+                    </div>
+                    <div className="pt-2 border-t border-emerald-200 dark:border-emerald-500/30 flex items-center justify-between">
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <FileText className="w-3.5 h-3.5" />
+                        Statutory A4 Document Available
+                      </span>
+                      <a
+                        href={`${API_BASE}/release-requests/${selectedReq.id}/certificate`}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={`AICTE_Release_Certificate_${selectedReq.fdr_number}.pdf`}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Official AICTE Release Certificate (PDF)</span>
+                      </a>
                     </div>
                   </div>
                 )}
