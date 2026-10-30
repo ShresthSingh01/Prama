@@ -92,18 +92,18 @@ const InstitutionNode = ({ data }: { data: any }) => (
 );
 
 const BankNode = ({ data }: { data: any }) => (
-  <div className="px-3 py-2.5 rounded-xl border border-purple-300 dark:border-purple-500/60 bg-white dark:bg-zinc-900 text-xs shadow-md min-w-[160px]">
-    <Handle type="target" position={Position.Top} className="!bg-purple-500 !w-2 !h-2" />
+  <div className="px-3 py-2.5 rounded-xl border border-indigo-300 dark:border-indigo-500/60 bg-white dark:bg-zinc-900 text-xs shadow-md min-w-[160px]">
+    <Handle type="target" position={Position.Top} className="!bg-indigo-500 !w-2 !h-2" />
     <div className="flex items-center gap-2">
-      <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
+      <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400">
         <Landmark className="w-3.5 h-3.5" />
       </div>
       <div className="overflow-hidden">
         <div className="font-semibold text-slate-900 dark:text-zinc-100 truncate max-w-[110px]">{data.label}</div>
-        <div className="text-[10px] text-purple-600 dark:text-purple-400 font-mono">Scheduled Bank</div>
+        <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono">Scheduled Bank</div>
       </div>
     </div>
-    <Handle type="source" position={Position.Bottom} className="!bg-purple-500 !w-2 !h-2" />
+    <Handle type="source" position={Position.Bottom} className="!bg-indigo-500 !w-2 !h-2" />
   </div>
 );
 
@@ -435,10 +435,10 @@ export default function GraphPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <Network className="w-5 h-5 text-amber-500" />
-            Bank & College Risk Network (Fraud Ring Detection)
+            Duplicate FDR &amp; Fraud Ring Detection Network
           </h1>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-            Interactive relationship map identifying duplicate fixed deposit certificates, shared serial numbers, and common bank branches.
+            Interactive AICTE relationship graph detecting duplicate fixed deposit certificates, shared serial numbers, and multi-college collusion.
           </p>
         </div>
 
@@ -465,9 +465,9 @@ export default function GraphPage() {
           </button>
           <button
             onClick={() => setFilterMode("BANKS")}
-            className={`px-3 py-1.5 rounded-md font-semibold transition ${filterMode === "BANKS" ? "bg-purple-600 text-white shadow-sm" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
+            className={`px-3 py-1.5 rounded-md font-semibold transition ${filterMode === "BANKS" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
-            Banks & FDRs
+            Banks &amp; FDRs
           </button>
         </div>
       </div>
@@ -479,7 +479,7 @@ export default function GraphPage() {
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-800">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
               <ShieldAlert className="w-4 h-4 text-rose-500" />
-              <span>Discovered Collusion Rings ({graphData?.collusion_rings.length || 0})</span>
+              <span>Suspected Duplicate Groups ({graphData?.collusion_rings.length || 0})</span>
             </div>
             <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-red-950 dark:text-red-300 border border-rose-200 dark:border-red-800">
               Rule R08

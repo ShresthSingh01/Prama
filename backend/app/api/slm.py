@@ -180,16 +180,23 @@ def search_instruments_natural_language(
             pass
         results.append({
             "id": inst.id,
-            "fdr_number": inst.fdr_number,
+            "institution_id": inst.institution_id,
             "institution_name": inst.institution.name if inst.institution else "",
-            "state": inst.institution.state if inst.institution else "",
+            "bank_id": inst.bank_id,
             "bank_name": inst.bank.name if inst.bank else "",
+            "fdr_number": inst.fdr_number,
             "amount": inst.amount,
+            "issue_date": inst.issue_date,
             "maturity_date": inst.maturity_date,
-            "days_to_maturity": days_to_mat,
+            "tenure_days": inst.tenure_days,
+            "interest_rate": inst.interest_rate,
             "status": inst.status,
             "trust_tier": inst.trust_tier,
             "risk_score": inst.risk_score,
+            "risk_band": inst.risk_band,
+            "days_to_maturity": days_to_mat,
+            "lien_marked": bool(inst.lien_marked) if inst.lien_marked is not None else False,
+            "joint_holding_confirmed": bool(inst.joint_holding_confirmed) if inst.joint_holding_confirmed is not None else False,
             "flags_count": len([f for f in inst.flags if f.status == "open"])
         })
 

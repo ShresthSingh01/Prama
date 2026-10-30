@@ -37,3 +37,14 @@ coverage/
 *.log
 .eslintcache
 .cache/
+
+# Agents & Local IDE Metadata
+.agent/
+.agents/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.impeccable/
+.opencode/
+frontend/.impeccable/

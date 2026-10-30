@@ -24,7 +24,8 @@ from backend.app.services.forensic_service import (
     get_instrument_forensics
 )
 from backend.app.services.extraction_service import extract_from_document
-from backend.app.schemas.api_schemas import InstrumentCreate
+from backend.app.services.certificate_service import generate_deficiency_notice
+from backend.app.schemas.api_schemas import InstrumentCreate, ManualVerifyRequest
 from backend.app.api.auth import get_optional_user, get_current_user, check_institution_access
 
 router = APIRouter(prefix="/instruments", tags=["Instruments"])
@@ -93,6 +94,8 @@ def list_instruments(
             "risk_score": inst.risk_score,
             "risk_band": inst.risk_band,
             "days_to_maturity": days_to_mat,
+            "lien_marked": bool(inst.lien_marked) if inst.lien_marked is not None else False,
+            "joint_holding_confirmed": bool(inst.joint_holding_confirmed) if inst.joint_holding_confirmed is not None else False,
             "flags_count": len([f for f in inst.flags if f.status == 'open'])
         })
     return items
@@ -133,6 +136,34 @@ def get_instrument_detail(
             "confidence": p.confidence,
             "updated_at": p.updated_at.strftime("%Y-%m-%d %H:%M") if p.updated_at else ""
         }
+
+    # Lineage computation (parent and renewals)
+    parent_info = None
+    if inst.parent_instrument_id:
+        p = db.query(Instrument).filter(Instrument.id == inst.parent_instrument_id).first()
+        if p:
+            parent_info = {
+                "id": p.id,
+                "fdr_number": p.fdr_number,
+                "status": p.status,
+                "amount": p.amount,
+                "amount_lakhs": round(p.amount / 100000.0, 2),
+                "maturity_date": p.maturity_date
+            }
+
+    renewals = db.query(Instrument).filter(Instrument.parent_instrument_id == inst.id).order_by(Instrument.id.asc()).all()
+    renewals_info = [
+        {
+            "id": c.id,
+            "fdr_number": c.fdr_number,
+            "status": c.status,
+            "amount": c.amount,
+            "amount_lakhs": round(c.amount / 100000.0, 2),
+            "issue_date": c.issue_date,
+            "maturity_date": c.maturity_date
+        }
+        for c in renewals
+    ]
         
     return {
         "id": inst.id,
@@ -154,7 +185,13 @@ def get_instrument_detail(
         "risk_score": inst.risk_score,
         "risk_band": inst.risk_band,
         "days_to_maturity": days_to_mat,
+        "lien_marked": bool(inst.lien_marked) if inst.lien_marked is not None else False,
+        "joint_holding_confirmed": bool(inst.joint_holding_confirmed) if inst.joint_holding_confirmed is not None else False,
         "parent_instrument_id": inst.parent_instrument_id,
+        "lineage": {
+            "parent": parent_info,
+            "renewals": renewals_info
+        },
         "provenance": prov_map,
         "documents": [
             {
@@ -236,6 +273,8 @@ def create_instrument(
         tenure_days=req.tenure_days,
         interest_rate=req.interest_rate,
         purpose=req.purpose or "AICTE Mandatory Security Deposit",
+        lien_marked=bool(req.lien_marked),
+        joint_holding_confirmed=bool(req.joint_holding_confirmed),
         status=InstrumentStatusEnum.SUBMITTED.value,
         trust_tier=TrustTierEnum.SELF_DECLARED.value
     )
@@ -268,6 +307,10 @@ def create_instrument(
     risk, band, _ = compute_instrument_risk_score(db, inst)
     inst.risk_score = risk
     inst.risk_band = band
+    open_flags = [f for f in inst.flags if f.status == "open"]
+    if open_flags and inst.status in [InstrumentStatusEnum.SUBMITTED.value, InstrumentStatusEnum.ACTIVE.value]:
+        inst.status = InstrumentStatusEnum.FLAGGED.value
+    db.commit()
     db.commit()
     
     actor_id = current_user.id if current_user else 1
@@ -487,6 +530,9 @@ async def upload_document(
     risk, band, _ = compute_instrument_risk_score(db, inst)
     inst.risk_score = risk
     inst.risk_band = band
+    open_flags = [f for f in inst.flags if f.status == "open"]
+    if open_flags and inst.status in [InstrumentStatusEnum.SUBMITTED.value, InstrumentStatusEnum.ACTIVE.value]:
+        inst.status = InstrumentStatusEnum.FLAGGED.value
     db.commit()
     
     actor_id = current_user.id if current_user else 1
@@ -581,3 +627,106 @@ async def add_observation(
         "text": str(text_val).strip()[:100]
     }, author_id, current_user.role if current_user else "officer")
     return {"success": True, "id": obs.id}
+
+@router.get("/{id}/deficiency-notice")
+@router.post("/{id}/deficiency-notice")
+def download_deficiency_notice(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """
+    Generates and returns an official, printable statutory AICTE Notice of Deficiency & Rectification Directive
+    for an FDR with discrepancies, upcoming maturity, or flagged irregularities.
+    """
+    inst = db.query(Instrument).options(
+        joinedload(Instrument.institution),
+        joinedload(Instrument.bank),
+        selectinload(Instrument.flags)
+    ).filter(Instrument.id == id).first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="Instrument not found")
+
+    officer_name = current_user.name if current_user else "P. S. Narayanan"
+    pdf_path = generate_deficiency_notice(db, inst, officer_name=officer_name)
+
+    actor_id = current_user.id if current_user else 1
+    actor_role = current_user.role if current_user else "scrutiny_officer"
+    log_audit_entry(db, "ISSUE_DEFICIENCY_NOTICE", "instrument", inst.id, {
+        "fdr_number": inst.fdr_number,
+        "institution_id": inst.institution_id,
+        "officer": officer_name
+    }, actor_id, actor_role)
+
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=f"AICTE_Deficiency_Notice_{inst.fdr_number}.pdf"
+    )
+
+@router.post("/{id}/verify/manual")
+def record_manual_bank_verification(
+    id: int,
+    payload: ManualVerifyRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """
+    Records an official physical bank confirmation letter (e.g. Speed Post dispatch or branch endorsement).
+    Upgrades trust tier to BANK_CONFIRMED, moves status to VERIFIED, and logs to Merkle audit trail.
+    """
+    inst = db.query(Instrument).filter(Instrument.id == id).first()
+    if not inst:
+        raise HTTPException(status_code=404, detail="Instrument not found")
+
+    user_id = current_user.id if current_user else 1
+    user_role = current_user.role if current_user else "scrutiny_officer"
+    user_name = current_user.name if current_user else "Statutory Scrutiny Officer"
+
+    ver = Verification(
+        instrument_id=inst.id,
+        method="manual",
+        result="valid",
+        responder_email=current_user.email if current_user else "attestation@aicte.gov.in",
+        responded_at=datetime.utcnow(),
+        evidence={
+            "dispatch_reference": payload.dispatch_reference,
+            "confirmation_date": payload.confirmation_date,
+            "officer_remarks": payload.officer_remarks or "Physical bank confirmation letter verified on record.",
+            "attesting_officer": user_name,
+            "method": "manual_speed_post_attestation"
+        }
+    )
+    db.add(ver)
+
+    inst.trust_tier = TrustTierEnum.BANK_CONFIRMED.value
+    if inst.status in [InstrumentStatusEnum.SUBMITTED.value, InstrumentStatusEnum.UNDER_SCRUTINY.value]:
+        inst.status = InstrumentStatusEnum.VERIFIED.value
+
+    compute_instrument_risk_score(db, inst)
+
+    log_audit_entry(
+        db,
+        action="MANUAL_BANK_VERIFICATION",
+        entity_type="instrument",
+        entity_id=inst.id,
+        payload={
+            "fdr_number": inst.fdr_number,
+            "dispatch_reference": payload.dispatch_reference,
+            "confirmation_date": payload.confirmation_date,
+            "remarks": payload.officer_remarks
+        },
+        actor_id=user_id,
+        actor_role=user_role
+    )
+    db.commit()
+    db.refresh(inst)
+
+    return {
+        "success": True,
+        "instrument_id": inst.id,
+        "trust_tier": inst.trust_tier,
+        "status": inst.status,
+        "verification_id": ver.id
+    }
+

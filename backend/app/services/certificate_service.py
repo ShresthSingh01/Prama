@@ -156,3 +156,149 @@ def generate_release_certificate(db: Any, release_req: Any) -> str:
     # Save high-res image canvas as PDF
     img.save(pdf_path, "PDF", resolution=150.0)
     return pdf_path
+
+
+def generate_deficiency_notice(db: Any, instrument: Any, officer_name: Any = None) -> str:
+    """
+    Generates an official, printable statutory AICTE Notice of Deficiency & Rectification Directive
+    for an FDR with discrepancies, missing lien, upcoming unrenewed maturity, or flagged irregularities.
+    Saves the file to storage_vault/certificates/deficiency_{instrument.id}.pdf and returns the file path.
+    """
+    cert_dir = os.path.join(settings.STORAGE_DIR, "certificates")
+    os.makedirs(cert_dir, exist_ok=True)
+    pdf_filename = f"deficiency_{instrument.id}.pdf"
+    pdf_path = os.path.join(cert_dir, pdf_filename)
+
+    institution_name = instrument.institution.name if instrument.institution else "Technical Institute"
+    aicte_id = instrument.institution.aicte_id if instrument.institution else "AICTE-2026-N/A"
+    state = instrument.institution.state if instrument.institution else "India"
+    bank_name = instrument.bank.name if instrument.bank else "Scheduled Commercial Bank"
+    fdr_no = instrument.fdr_number
+    amount_str = f"INR {instrument.amount:,.2f}"
+    
+    from backend.app.services.clock_service import get_simulated_now
+    sim_now = get_simulated_now(db)
+    notice_date = sim_now.strftime("%d-%b-%Y")
+    
+    # Standard A4 dimensions at 150 DPI: 1240 x 1754 px
+    w, h = 1240, 1754
+    img = Image.new("RGB", (w, h), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    # Red/Gold Warning Regulatory Border
+    draw.rectangle([20, 20, w - 21, h - 21], outline=(180, 40, 30), width=4)
+    draw.rectangle([28, 28, w - 29, h - 29], outline=(200, 160, 80), width=2)
+    draw.rectangle([34, 34, w - 35, h - 35], outline=(240, 220, 220), width=1)
+
+    # Fonts
+    font_h1 = ImageFont.load_default(size=24)
+    font_h2 = ImageFont.load_default(size=14)
+    font_title = ImageFont.load_default(size=18)
+    font_label = ImageFont.load_default(size=12)
+    font_val = ImageFont.load_default(size=14)
+    font_val_bold = ImageFont.load_default(size=16)
+    font_body = ImageFont.load_default(size=12)
+    font_mono = ImageFont.load_default(size=10)
+
+    # Top Header Banner
+    draw.text((w // 2, 60), "ALL INDIA COUNCIL FOR TECHNICAL EDUCATION", fill=(15, 30, 80), font=font_h1, anchor="mt")
+    draw.text((w // 2, 95), "MINISTRY OF EDUCATION, GOVERNMENT OF INDIA", fill=(100, 105, 115), font=font_h2, anchor="mt")
+    draw.text((w // 2, 118), "REGULATION BUREAU - STATUTORY COMPLIANCE & MONITORING DESK", fill=(140, 30, 20), font=font_body, anchor="mt")
+
+    # Divider Ribbon
+    draw.rectangle([60, 150, w - 60, 195], fill=(255, 243, 240), outline=(200, 60, 40), width=1)
+    draw.text((w // 2, 172), "FORMAL STATUTORY NOTICE OF DEFICIENCY & RECTIFICATION DIRECTIVE", fill=(180, 25, 20), font=font_title, anchor="mm")
+
+    # Metadata Box
+    y_start = 220
+    draw.text((80, y_start), f"NOTICE REF NO: AICTE/REG/DEF/2026/{instrument.id:05d}", fill=(180, 25, 20), font=font_val_bold)
+    draw.text((w - 80, y_start), f"DATE OF ISSUANCE: {notice_date}", fill=(70, 75, 85), font=font_val_bold, anchor="rt")
+
+    # Recipient Box
+    y_inst = y_start + 45
+    draw.rectangle([80, y_inst, w - 80, y_inst + 85], fill=(255, 252, 252), outline=(220, 180, 180), width=1)
+    draw.text((100, y_inst + 15), "TO: THE CHAIRMAN / PRINCIPAL:", fill=(120, 60, 50), font=font_label)
+    draw.text((100, y_inst + 35), institution_name.upper(), fill=(15, 30, 80), font=font_val_bold)
+    draw.text((100, y_inst + 60), f"PERMANENT AICTE INSTITUTE ID: {aicte_id} | STATE: {state}", fill=(70, 80, 95), font=font_val)
+
+    # Subject
+    y_subj = y_inst + 105
+    draw.rectangle([80, y_subj, w - 80, y_subj + 45], fill=(245, 247, 250), outline=(200, 210, 225), width=1)
+    draw.text((100, y_subj + 14), f"SUBJECT: Regulatory Non-Compliance in Security Deposit FDR No. {fdr_no} (APH Clause 6.46)", fill=(15, 30, 80), font=font_val_bold)
+
+    # Discrepancy Table
+    y_grid = y_subj + 65
+    draw.rectangle([80, y_grid, w - 80, y_grid + 190], fill=(255, 255, 255), outline=(200, 200, 200), width=1)
+    
+    draw.text((100, y_grid + 15), "FIXED DEPOSIT RECEIPT NUMBER:", fill=(110, 115, 125), font=font_label)
+    draw.text((100, y_grid + 35), fdr_no, fill=(15, 30, 80), font=font_val_bold)
+
+    draw.text((w // 2 + 20, y_grid + 15), "DECLARED PRINCIPAL AMOUNT:", fill=(110, 115, 125), font=font_label)
+    draw.text((w // 2 + 20, y_grid + 35), amount_str, fill=(180, 40, 30), font=font_val_bold)
+
+    draw.line([80, y_grid + 75, w - 80, y_grid + 75], fill=(230, 230, 230), width=1)
+
+    draw.text((100, y_grid + 90), "ISSUING BANK:", fill=(110, 115, 125), font=font_label)
+    draw.text((100, y_grid + 110), bank_name, fill=(20, 30, 45), font=font_val)
+
+    draw.text((w // 2 + 20, y_grid + 90), "MATURITY DATE / STATUS:", fill=(110, 115, 125), font=font_label)
+    draw.text((w // 2 + 20, y_grid + 110), f"{instrument.maturity_date} ({instrument.status})", fill=(180, 40, 30), font=font_val_bold)
+
+    draw.line([80, y_grid + 145, w - 80, y_grid + 145], fill=(230, 230, 230), width=1)
+
+    # Specific Deficiencies
+    y_def = y_grid + 215
+    draw.rectangle([80, y_def, w - 80, y_def + 260], fill=(254, 248, 248), outline=(230, 180, 180), width=1)
+    draw.text((100, y_def + 15), "SPECIFIC COMPLIANCE IRREGULARITIES DETECTED UPON SCRUTINY:", fill=(180, 25, 20), font=font_val_bold)
+
+    deficiencies = []
+    # Collect open flags
+    for f in (instrument.flags or []):
+        if getattr(f, "status", "") == "open":
+            deficiencies.append(f"• [{f.code}] {f.explanation}")
+    
+    if not instrument.lien_marked:
+        deficiencies.append("• [LIEN_PENDING] Formal statutory lien endorsement in favour of 'Member Secretary, AICTE' is not confirmed on record.")
+    if not instrument.joint_holding_confirmed:
+        deficiencies.append("• [JOINT_HOLDING] Instrument is not confirmed in joint holding with Regional Officer, AICTE as mandated by APH Clause 6.46.")
+    
+    if not deficiencies:
+        deficiencies.append("• [APPROACHING_MATURITY] Instrument is maturing without an approved renewal/replacement submission on the digital portal.")
+        deficiencies.append("• [STATUTORY_VERIFICATION] Bank branch independent confirmation pending submission.")
+
+    for idx, d in enumerate(deficiencies[:5]):
+        d_line = d if len(d) <= 100 else d[:97] + "..."
+        draw.text((100, y_def + 45 + (idx * 26)), d_line, fill=(140, 20, 15), font=font_body)
+
+    # Mandatory Directive Box
+    y_dir = y_def + 285
+    draw.rectangle([80, y_dir, w - 80, y_dir + 150], fill=(255, 255, 255), outline=(180, 185, 195), width=1)
+    draw.text((100, y_dir + 15), "STATUTORY RECTIFICATION DIRECTIVE & TIMELINE:", fill=(15, 30, 80), font=font_val_bold)
+
+    dir_lines = [
+        "1. In accordance with Section 10(k) of the AICTE Act 1987 and Approval Process Regulations, the Institution",
+        "   is hereby granted FIFTEEN (15) CALENDAR DAYS from the date of this notice to rectify the noted deficiencies.",
+        "2. The Institution must upload the renewed/rectified instrument with verified bank lien endorsement directly",
+        "   on the AICTE Security Deposit Portal (Prama) at https://prama.aicte.gov.in/submit.",
+        "3. Failure to comply will automatically result in withholding of Extension of Approval (EoA) and initiate regulatory penalty."
+    ]
+    for idx, dl in enumerate(dir_lines):
+        draw.text((100, y_dir + 45 + (idx * 20)), dl, fill=(50, 55, 65), font=font_body)
+
+    # Signatures
+    y_sig = y_dir + 175
+    draw.line([80, y_sig, w - 80, y_sig], fill=(220, 220, 220), width=1)
+
+    officer_display = officer_name or "P. S. Narayanan"
+    draw.text((100, y_sig + 20), "ISSUED BY ORDER OF THE COMPETENT AUTHORITY:", fill=(100, 110, 130), font=font_label)
+    draw.text((100, y_sig + 40), f"{officer_display} (Scrutiny Officer)", fill=(15, 30, 80), font=font_val_bold)
+    draw.text((100, y_sig + 62), "Regulation Bureau, All India Council for Technical Education", fill=(80, 85, 95), font=font_body)
+    draw.text((100, y_sig + 82), "Nelson Mandela Marg, Vasant Kunj, New Delhi-110070", fill=(120, 125, 135), font=font_mono)
+
+    # Verification QR
+    qr_payload = f"AICTE-DEFICIENCY-NOTICE:ID={instrument.id}|FDR={fdr_no}|DATE={notice_date}"
+    qr_img = qrcode.make(qr_payload).resize((110, 110))
+    img.paste(qr_img, (w - 200, y_sig + 15))
+
+    img.save(pdf_path, "PDF", resolution=150.0)
+    return pdf_path

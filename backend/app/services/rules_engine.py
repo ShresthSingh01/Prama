@@ -40,6 +40,16 @@ def evaluate_instrument_rules(db: Session, instrument: Instrument, ocr_data: Opt
                 "explanation": f"Declared tenure ({instrument.tenure_days} days) does not match maturity date. Expected ~{expected_maturity.strftime('%Y-%m-%d')}, declared {instrument.maturity_date} (variance: {diff_days} days, tolerance: {tolerance_days} days).",
                 "evidence": {"issue_date": instrument.issue_date, "tenure_days": instrument.tenure_days, "expected": expected_maturity.strftime('%Y-%m-%d'), "declared": instrument.maturity_date, "tolerance_days": tolerance_days}
             })
+
+        # Check statutory minimum lock-in (AICTE norms require minimum 5-8 years for technical institutions)
+        min_lockin_days = int(get_rule_parameter("R02", "min_lockin_days", default=1825))
+        if instrument.tenure_days < min_lockin_days:
+            new_flags.append({
+                "code": "R02_TENURE_BELOW_STATUTORY_MINIMUM",
+                "severity": FlagSeverityEnum.HIGH.value,
+                "explanation": f"Declared tenure of {instrument.tenure_days} days (~{round(instrument.tenure_days/365, 1)} years) is below mandatory AICTE statutory lock-in period ({min_lockin_days} days / ~5-8 years). Risk of premature encashment before academic cycle completion.",
+                "evidence": {"tenure_days": instrument.tenure_days, "min_lockin_days": min_lockin_days}
+            })
     except Exception as e:
         new_flags.append({
             "code": "R02_DATE_PARSE_ERROR",

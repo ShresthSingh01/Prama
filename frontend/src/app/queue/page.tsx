@@ -27,6 +27,8 @@ interface InstrumentRow {
   risk_band: string;
   days_to_maturity: number;
   flags_count: number;
+  lien_marked?: boolean;
+  joint_holding_confirmed?: boolean;
 }
 
 export default function QueuePage() {
@@ -50,9 +52,12 @@ export default function QueuePage() {
       if (search) params.append("search", search);
       if (selectedTier !== "ALL") params.append("trust_tier", selectedTier);
       if (selectedRisk !== "ALL") params.append("risk_band", selectedRisk);
-      if (selectedStatus !== "ALL") params.append("status", selectedStatus);
+      if (selectedStatus !== "ALL" && selectedStatus !== "LIEN_PENDING") params.append("status", selectedStatus);
 
-      const data = await fetchApi<InstrumentRow[]>(`/instruments?${params.toString()}`);
+      let data = await fetchApi<InstrumentRow[]>(`/instruments?${params.toString()}`);
+      if (selectedStatus === "LIEN_PENDING") {
+        data = data.filter(i => !i.lien_marked);
+      }
       setInstruments(data);
       setPage(1);
     } catch (e) {
@@ -103,6 +108,11 @@ export default function QueuePage() {
 
   const totalPages = Math.ceil(instruments.length / pageSize) || 1;
   const displayedInstruments = instruments.slice((page - 1) * pageSize, page * pageSize);
+
+  const criticalCount = instruments.filter(i => i.risk_band === "CRITICAL").length;
+  const highCount = instruments.filter(i => i.risk_band === "HIGH").length;
+  const mediumCount = instruments.filter(i => i.risk_band === "MEDIUM").length;
+  const lowCount = instruments.filter(i => i.risk_band === "LOW").length;
 
   return (
     <div className="space-y-5">
@@ -183,7 +193,7 @@ export default function QueuePage() {
                   className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition group"
                 >
                   <div className="flex items-center gap-2">
-                    <Download className="w-3.5 h-3.5 text-purple-500" />
+                    <Download className="w-3.5 h-3.5 text-amber-500" />
                     <span>Regulatory Intervention Cases</span>
                   </div>
                   <span className="text-[10px] font-mono text-slate-400">CSV</span>
@@ -191,6 +201,75 @@ export default function QueuePage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* AICTE PS 26265 Mandated Statutory Reports Card */}
+      <div className="bg-white dark:bg-zinc-900/80 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <FileSpreadsheet className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                Mandated Statutory Reports (AICTE Regulation Bureau)
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                1-click statutory audits required under PS 26265 — live generated in CSV format.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <a
+            href={`${API_BASE}/reports/pending-verifications?format=csv`}
+            download="Pending_Verifications_Report.csv"
+            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 transition group"
+          >
+            <div className="flex items-center gap-2">
+              <Download className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Pending Bank Verifications</span>
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">CSV</span>
+          </a>
+
+          <a
+            href={`${API_BASE}/reports/upcoming-maturities?format=csv`}
+            download="Upcoming_Maturities_Report.csv"
+            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 transition group"
+          >
+            <div className="flex items-center gap-2">
+              <Download className="w-3.5 h-3.5 text-blue-500 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Upcoming Maturities (&lt;90d)</span>
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">CSV</span>
+          </a>
+
+          <a
+            href={`${API_BASE}/reports/missing-documents?format=csv`}
+            download="Missing_Documents_Report.csv"
+            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 transition group"
+          >
+            <div className="flex items-center gap-2">
+              <Download className="w-3.5 h-3.5 text-rose-500 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Missing Receipt Documents</span>
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">CSV</span>
+          </a>
+
+          <a
+            href={`${API_BASE}/reports/intervention-cases?format=csv`}
+            download="Intervention_Cases_Report.csv"
+            className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-950 dark:hover:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700/80 transition group"
+          >
+            <div className="flex items-center gap-2">
+              <Download className="w-3.5 h-3.5 text-amber-500 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Intervention Cases</span>
+            </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">CSV</span>
+          </a>
         </div>
       </div>
 
@@ -304,11 +383,83 @@ export default function QueuePage() {
               <option value="EXPIRING">Expiring (&lt;90 days)</option>
               <option value="OVERDUE">Overdue (Expired)</option>
               <option value="FLAGGED">Discrepancy Flagged</option>
+              <option value="LIEN_PENDING">AICTE Lien Pending</option>
               <option value="RELEASE_REQUESTED">Release Requested</option>
               <option value="RELEASED">Released</option>
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Risk Band Summary Quick Filter Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <button
+          onClick={() => setSelectedRisk(selectedRisk === "CRITICAL" ? "ALL" : "CRITICAL")}
+          className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between ${
+            selectedRisk === "CRITICAL"
+              ? "bg-rose-50 dark:bg-rose-950/40 border-rose-500 ring-2 ring-rose-500/30"
+              : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-rose-300 dark:hover:border-rose-900"
+          }`}
+        >
+          <div>
+            <span className="text-[10px] uppercase font-bold text-rose-600 dark:text-rose-400 block tracking-wider">Critical Priority</span>
+            <span className="text-slate-500 dark:text-zinc-400 text-[11px]">Immediate intervention</span>
+          </div>
+          <span className="text-base font-bold font-mono text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded-lg bg-rose-500/10">
+            {criticalCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSelectedRisk(selectedRisk === "HIGH" ? "ALL" : "HIGH")}
+          className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between ${
+            selectedRisk === "HIGH"
+              ? "bg-amber-50 dark:bg-amber-950/40 border-amber-500 ring-2 ring-amber-500/30"
+              : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-amber-300 dark:hover:border-amber-900"
+          }`}
+        >
+          <div>
+            <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400 block tracking-wider">High Risk</span>
+            <span className="text-slate-500 dark:text-zinc-400 text-[11px]">Expiring or flagged</span>
+          </div>
+          <span className="text-base font-bold font-mono text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-lg bg-amber-500/10">
+            {highCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSelectedRisk(selectedRisk === "MEDIUM" ? "ALL" : "MEDIUM")}
+          className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between ${
+            selectedRisk === "MEDIUM"
+              ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/30"
+              : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-900"
+          }`}
+        >
+          <div>
+            <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 block tracking-wider">Medium Risk</span>
+            <span className="text-slate-500 dark:text-zinc-400 text-[11px]">Routine verification</span>
+          </div>
+          <span className="text-base font-bold font-mono text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg bg-blue-500/10">
+            {mediumCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setSelectedRisk(selectedRisk === "LOW" ? "ALL" : "LOW")}
+          className={`p-2.5 rounded-xl border transition text-left flex items-center justify-between ${
+            selectedRisk === "LOW"
+              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500/30"
+              : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-emerald-300 dark:hover:border-emerald-900"
+          }`}
+        >
+          <div>
+            <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 block tracking-wider">Low / Compliant</span>
+            <span className="text-slate-500 dark:text-zinc-400 text-[11px]">Bank verified & active</span>
+          </div>
+          <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-lg bg-emerald-500/10">
+            {lowCount}
+          </span>
+        </button>
       </div>
 
       {/* Main Table */}
@@ -328,11 +479,11 @@ export default function QueuePage() {
               <thead>
                 <tr className="bg-slate-50 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-slate-500 dark:text-zinc-400 uppercase text-[10px] tracking-wider">
                   <th className="py-3 px-4 font-semibold">College / Institution</th>
-                  <th className="py-3 px-4 font-semibold">FDR Serial & Bank</th>
+                  <th className="py-3 px-4 font-semibold">FDR Reference & Bank</th>
                   <th className="py-3 px-4 font-semibold">Amount (₹)</th>
                   <th className="py-3 px-4 font-semibold">Maturity / Expiry</th>
-                  <th className="py-3 px-4 font-semibold">Verification Status</th>
-                  <th className="py-3 px-4 font-semibold">Risk Priority</th>
+                  <th className="py-3 px-4 font-semibold">Verification Level</th>
+                  <th className="py-3 px-4 font-semibold">Priority Level</th>
                   <th className="py-3 px-4 font-semibold">Status</th>
                   <th className="py-3 px-4 text-right font-semibold">Action</th>
                 </tr>
@@ -407,13 +558,26 @@ export default function QueuePage() {
                     </td>
 
                     <td className="py-3 px-4 text-right">
-                      <Link
-                        href={`/inspector/${inst.id}`}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1 shadow-sm"
-                      >
-                        <span>Review</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Link
+                          href={`/inspector/${inst.id}`}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1 shadow-sm"
+                          title="Open Scrutiny Desk"
+                        >
+                          <span>Review</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                        <a
+                          href={`${API_BASE}/instruments/${inst.id}/deficiency-notice`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 rounded-lg text-xs font-semibold transition inline-flex items-center gap-1 shadow-sm"
+                          title="Download Official AICTE Statutory Deficiency Notice (PDF)"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span className="hidden xl:inline">Notice</span>
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -50,7 +50,7 @@ const ConceptNode = ({ data }: { data: any }) => {
   const typeColors: Record<string, { bg: string; text: string; border: string }> = {
     rule: { bg: "bg-red-50 dark:bg-red-500/10", text: "text-red-700 dark:text-red-400", border: "border-red-300 dark:border-red-500/40" },
     policy: { bg: "bg-blue-50 dark:bg-blue-500/10", text: "text-blue-700 dark:text-blue-400", border: "border-blue-300 dark:border-blue-500/40" },
-    bank: { bg: "bg-purple-50 dark:bg-purple-500/10", text: "text-purple-700 dark:text-purple-400", border: "border-purple-300 dark:border-purple-500/40" },
+    bank: { bg: "bg-indigo-50 dark:bg-indigo-500/10", text: "text-indigo-700 dark:text-indigo-400", border: "border-indigo-300 dark:border-indigo-500/40" },
     lifecycle: { bg: "bg-emerald-50 dark:bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400", border: "border-emerald-300 dark:border-emerald-500/40" },
     regulation: { bg: "bg-amber-50 dark:bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", border: "border-amber-300 dark:border-amber-500/40" },
   };

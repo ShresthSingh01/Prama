@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from backend.app.models.database import get_db
 from backend.app.models.entities import AuditLog
-from backend.app.services.audit_service import verify_audit_chain, invalidate_audit_cache
+from backend.app.services.audit_service import verify_audit_chain, invalidate_audit_cache, repair_audit_chain
 
 router = APIRouter(prefix="/audit", tags=["Cryptographic Audit Ledger"])
 
@@ -61,4 +61,17 @@ def simulate_database_tampering(entry_id: int, db: Session = Depends(get_db)):
     return {
         "success": True,
         "message": f"Simulated backdoor tamper executed on audit entry #{entry_id}. Re-verify chain to see cryptographic alarm."
+    }
+
+@router.post("/restore")
+def restore_audit_chain(db: Session = Depends(get_db)):
+    """
+    Self-healing routine: Cleans any sabotage injection residue and
+    recomputes contiguous SHA-256 block hashes, returning chain to verified state.
+    """
+    result = repair_audit_chain(db)
+    return {
+        "success": True,
+        "message": "Audit ledger cryptographically reconciled and restored.",
+        "verification": result
     }

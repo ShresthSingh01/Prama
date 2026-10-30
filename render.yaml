@@ -1,0 +1,40 @@
+services:
+  # Backend API Service
+  - type: web
+    name: prama-backend
+    env: python
+    region: oregon
+    plan: standard
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DEMO_MODE
+        value: "true"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: LLM_PROVIDER
+        value: "auto"
+      - key: GEMINI_API_KEY
+        sync: false
+    healthCheckPath: /health
+
+  # Frontend Cockpit Service
+  - type: web
+    name: prama-frontend
+    env: node
+    region: oregon
+    plan: standard
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: prama-backend
+          property: host
+          envVarKey: NEXT_PUBLIC_API_URL
+

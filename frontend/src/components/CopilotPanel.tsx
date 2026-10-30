@@ -237,7 +237,7 @@ export default function CopilotPanel({
                           {c.doc_title}
                         </div>
                         {c.quote && (
-                          <blockquote className="p-2 bg-white dark:bg-zinc-900/80 rounded border-l-2 border-blue-500 text-[11px] text-slate-700 dark:text-zinc-300 italic">
+                          <blockquote className="p-2.5 bg-slate-50 dark:bg-zinc-900/90 rounded-md border border-slate-200 dark:border-zinc-800 text-[11px] text-slate-700 dark:text-zinc-300 italic">
                             &quot;{c.quote}&quot;
                           </blockquote>
                         )}

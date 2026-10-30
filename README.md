@@ -5,14 +5,15 @@
 ![AICTE Banner](https://img.shields.io/badge/AICTE-Regulation_Bureau-003366?style=for-the-badge&logo=gov.in&logoColor=white)
 ![Hackathon](https://img.shields.io/badge/Smart_India_Hackathon-PS_26265-FF9933?style=for-the-badge)
 ![Category](https://img.shields.io/badge/Category-Software_%2F_Smart_Automation-138808?style=for-the-badge)
-![Status](https://img.shields.io/badge/Tests-25%2F25_Passing-success?style=for-the-badge)
+![Status](https://img.shields.io/badge/Tests-29%2F29_Passing-success?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 **Prama (प्रमा) — Valid Knowledge, Truth & Sovereign Trust**  
 *Turning passive document archiving into active cryptographic trust, forensic discrepancy detection, and regulatory risk intelligence.*
 
 > **Etymology & Philosophy**: In Indian epistemology (*Nyāya Darśana*), **Pramā (प्रमा)** signifies *uncontradicted, genuine truth and verified knowledge* acquired through rigorous proof (*Pramāṇa*). Prama transforms statutory document monitoring from blind clerical trust into mathematically verifiable truth.
 
-[Architecture](#-system-architecture) • [Core Innovations](#-core-innovations-the-9-jury-wow-factors) • [Quick Start](#-quick-start--installation) • [4-Minute Jury Walkthrough](#-live-sih-jury-demo-script-4-minutes) • [Rubric Mapping](#-sih-ps-26265-compliance-matrix)
+[Architecture](#-system-architecture) • [Core Innovations](#-core-innovations-the-9-jury-wow-factors) • [Quick Start & Docker Deploy](#quick-start--installation) • [Deployment Guide](DEPLOYMENT.md) • [4-Minute Jury Walkthrough](#-live-sih-jury-demo-script-4-minutes) • [Rubric Mapping](#-sih-ps-26265-compliance-matrix)
 
 </div>
 
@@ -184,14 +185,27 @@ Every submitted FDR passes through an automated, deterministic verification matr
 
 ## Quick Start & Installation
 
-### Prerequisites
-- **Python**: 3.11, 3.12, or 3.13
-- **Node.js**: v18.0.0 or higher
-- **PowerShell / Bash**
+### Option 1: 1-Command Production Docker Deployment (Recommended)
+Launch the entire system (FastAPI backend + Next.js standalone frontend) in isolated production containers:
+
+```bash
+# On Linux / macOS:
+chmod +x deploy.sh && ./deploy.sh
+
+# On Windows (PowerShell):
+.\deploy.ps1
+
+# Or standard Docker Compose:
+docker compose up --build -d
+```
+- **Web Terminal**: `http://localhost:3000`
+- **Backend API & Swagger Docs**: `http://localhost:8000/docs`
+- **Health Check**: `http://localhost:8000/health`
+- *For detailed multi-cloud and VPS instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).*
 
 ---
 
-### Option A: One-Click Windows Launcher (Recommended)
+### Option 2: Local Windows Development Launcher
 Run the automated runner from the project root:
 ```powershell
 .\run_dev.ps1
@@ -206,7 +220,7 @@ This script automatically:
 
 ---
 
-### Option B: Manual Startup
+### Option 3: Manual Startup
 
 #### 1. Backend Service
 ```powershell
@@ -225,10 +239,10 @@ npm run dev
 ```
 - Web Terminal: `http://localhost:3000`
 
-#### 3. Run Automated Acceptance Suite (25/25 Passing)
+#### 3. Run Automated Acceptance Suite (29/29 Passing)
 ```powershell
 $env:PYTHONPATH="."
-.\.venv\Scripts\pytest.exe -v
+.\.venv\Scripts\pytest.exe backend/tests/ -v
 ```
 
 ---

@@ -55,38 +55,19 @@ export default function ReleasePortalPage() {
     setSeeding(true);
     setActionMessage(null);
     try {
-      let instId = 1;
-      try {
-        const instruments = await fetchApi<any[]>("/instruments");
-        if (instruments && instruments.length > 0) {
-          // Find an instrument without open flags if possible
-          const cleanInst = instruments.find(i => i.flags_count === 0 && i.status !== "released");
-          if (cleanInst) {
-            instId = cleanInst.id;
-          } else {
-            instId = instruments[0].id;
-          }
-        }
-      } catch (e) {
-        console.warn("Could not query instruments list, defaulting to ID 1");
-      }
-
-      const res = await fetchApi<any>(`/instruments/${instId}/release-requests`, {
-        method: "POST",
-        body: JSON.stringify({
-          reason: "10-Year Statutory Term Completed - Compliance Cleared (Sample Test)"
-        })
+      const res = await fetchApi<any>("/release-requests/seed-sample", {
+        method: "POST"
       });
 
       setActionMessage({
         success: true,
-        text: `Sample release request #${res.release_request_id} created for Instrument #${instId}. You can now test the Maker Scrutiny and Checker Authorization steps below!`
+        text: `Sample release request #${res.release_request_id} created for compliant FDR #${res.fdr_number}. You can now test the Maker Scrutiny and Senior Approver steps below!`
       });
       await loadRequests();
     } catch (e: any) {
       setActionMessage({
         success: false,
-        text: e.message || "Failed to seed sample release request. Make sure the deposit has zero open regulatory flags."
+        text: e.message || "Failed to seed sample release request."
       });
     } finally {
       setSeeding(false);
@@ -102,16 +83,9 @@ export default function ReleasePortalPage() {
     setActing(true);
     setActionMessage(null);
     try {
-      const loginRes = await fetchApi<any>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: "maker@aicte.gov.in", password: "Password@123" })
-      });
-      const token = loginRes.access_token;
-
       const res = await fetchApi<any>(`/release-requests/${selectedReq.id}/maker-scrutiny`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ decision, remarks: "Maker verified compliance and validity." })
+        body: JSON.stringify({ decision, remarks: "Maker verified statutory compliance and validity under APH Clause 6.46." })
       });
 
       setActionMessage({
@@ -120,7 +94,7 @@ export default function ReleasePortalPage() {
       });
       await loadRequests();
     } catch (e: any) {
-      setActionMessage({ success: false, text: e.message });
+      setActionMessage({ success: false, text: e.message || "Maker scrutiny review failed." });
     } finally {
       setActing(false);
     }
@@ -131,16 +105,19 @@ export default function ReleasePortalPage() {
     setActing(true);
     setActionMessage(null);
     try {
-      const email = simulateViolation ? "maker@aicte.gov.in" : "checker@aicte.gov.in";
-      const loginRes = await fetchApi<any>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password: "Password@123" })
-      });
-      const token = loginRes.access_token;
+      let customHeaders: Record<string, string> = {};
+      if (simulateViolation) {
+        // Specifically authenticate as Maker to demonstrate 403 dual-control separation enforcement
+        const loginRes = await fetchApi<any>("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email: "maker@aicte.gov.in", password: "Password@123" })
+        });
+        customHeaders = { Authorization: `Bearer ${loginRes.access_token}` };
+      }
 
       const res = await fetchApi<any>(`/release-requests/${selectedReq.id}/checker-approval`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: customHeaders,
         body: JSON.stringify({ decision, remarks: "Bureau Director authorized release." })
       });
 
@@ -184,24 +161,56 @@ export default function ReleasePortalPage() {
             ) : (
               <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
             )}
-            <span>Seed Test Release Request</span>
+            <span>Create Sample Release Request (Demo)</span>
           </button>
         </div>
       </div>
 
-      {actionMessage && (
-        <div className={`p-4 rounded-xl text-xs border ${
-          actionMessage.success 
-            ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300" 
-            : "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-300"
-        }`}>
-          <div className="font-semibold flex items-center gap-1.5 text-sm">
-            {actionMessage.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-rose-600" />}
-            {actionMessage.success ? "Regulatory Action Completed" : "Dual-Control Safety Rule Triggered"}
+      {actionMessage && (() => {
+        const isClause646 = actionMessage.text.includes("Clause 6.46") || actionMessage.text.includes("Pre-check Failed");
+        const isMakerChecker = actionMessage.text.includes("Maker-Checker") || actionMessage.text.includes("403") || actionMessage.text.includes("Separation") || actionMessage.text.includes("cannot authorize");
+
+        return (
+          <div className={`p-4 rounded-xl text-xs border ${
+            actionMessage.success 
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-300" 
+              : "bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/40 dark:border-rose-500/50 dark:text-rose-300 shadow-md animate-in fade-in"
+          }`}>
+            <div className="font-semibold flex items-center justify-between gap-2 text-sm">
+              <div className="flex items-center gap-1.5">
+                {actionMessage.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-rose-600" />}
+                <span>
+                  {actionMessage.success 
+                    ? "Regulatory Action Completed" 
+                    : isClause646
+                    ? "Clause 6.46 Statutory Pre-Check Gate Triggered"
+                    : isMakerChecker
+                    ? "Dual-Control Safety Gate Triggered"
+                    : "Regulatory Gate Blocked"}
+                </span>
+              </div>
+              {!actionMessage.success && (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 font-mono">
+                  {isClause646 ? "APH CLAUSE 6.46 ENFORCED" : isMakerChecker ? "RBAC ENFORCED: 403 FORBIDDEN" : "STATUTORY GATE ENFORCED"}
+                </span>
+              )}
+            </div>
+            <div className="mt-1.5 font-mono text-xs">{actionMessage.text}</div>
+            {!actionMessage.success && (
+              <div className="mt-2 pt-2 border-t border-rose-200 dark:border-rose-900/40 text-[11px] text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  {isClause646 ? (
+                    <><strong>APH Clause 6.46 Statutory Rule:</strong> Security deposits can only be released after maturity tenure is met, bank cryptographic verification is complete, and original FDR receipts are verified on record.</>
+                  ) : (
+                    <><strong>Separation of Duties Guarantee:</strong> Under AICTE financial regulations, an officer who performed initial scrutiny cannot authorize final refund or release. Switch to &apos;Senior Director (Checker)&apos; in the top navigation bar to execute authorization.</>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="mt-1 font-mono">{actionMessage.text}</div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Main Grid: Release Requests Queue + Decision Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -216,7 +225,7 @@ export default function ReleasePortalPage() {
             <div className="p-8 text-center text-xs text-slate-500 dark:text-zinc-400 font-medium">Loading release requests...</div>
           ) : requests.length === 0 ? (
             <div className="p-6 text-center text-xs space-y-3 bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-200 dark:border-zinc-800">
-              <div className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mx-auto">
+              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/40 flex items-center justify-center mx-auto">
                 <FileCheck2 className="w-5 h-5" />
               </div>
               <div>
@@ -228,10 +237,10 @@ export default function ReleasePortalPage() {
               <button
                 onClick={handleSeedSampleRequest}
                 disabled={seeding}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition shadow-sm"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition shadow-sm"
               >
-                <Sparkles className="w-3 h-3" />
-                <span>Seed Test Release Request</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Create Sample Release Request (Demo)</span>
               </button>
             </div>
           ) : (
@@ -242,12 +251,12 @@ export default function ReleasePortalPage() {
                   onClick={() => setSelectedReq(req)}
                   className={`p-3.5 rounded-xl border text-xs cursor-pointer transition ${
                     selectedReq?.id === req.id 
-                      ? "bg-purple-50 border-purple-400 text-slate-900 dark:bg-zinc-800 dark:border-purple-500 dark:text-white shadow-sm" 
+                      ? "bg-amber-500/10 border-amber-500/40 text-slate-900 dark:bg-zinc-800 dark:border-amber-500/60 dark:text-white shadow-sm" 
                       : "bg-slate-50 border-slate-200 text-slate-700 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono font-bold text-purple-700 dark:text-purple-400">{req.fdr_number}</span>
+                    <span className="font-mono font-bold text-amber-700 dark:text-amber-400">{req.fdr_number}</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       req.status === "released" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400" :
                       req.status === "under_review" ? "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400" :
@@ -273,11 +282,54 @@ export default function ReleasePortalPage() {
               <div className="border-b border-slate-200 dark:border-zinc-800 pb-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono text-slate-500 dark:text-zinc-400 font-semibold">REQUEST #{selectedReq.id}</span>
-                  <span className="text-xs font-bold text-purple-700 dark:text-purple-400">STATUS: {selectedReq.status.toUpperCase()}</span>
+                  <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400">STATUS: {selectedReq.status.toUpperCase()}</span>
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1 font-mono">{selectedReq.fdr_number}</h2>
                 <div className="text-sm font-medium text-slate-700 dark:text-zinc-300">{selectedReq.institution_name}</div>
                 <div className="text-xs text-amber-700 dark:text-amber-400 mt-1 font-mono font-bold">Pledged Security Corpus: ₹{selectedReq.amount.toLocaleString("en-IN")}/-</div>
+              </div>
+
+              {/* 3-Step Visual Workflow Stepper */}
+              <div className="bg-slate-50 dark:bg-zinc-950 p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-2">
+                  AICTE Dual Maker-Checker Release Lifecycle
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className={`p-2 rounded-lg border flex items-center gap-2 ${
+                    selectedReq.status !== "rejected"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-semibold"
+                      : "bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-500"
+                  }`}>
+                    <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
+                    <span className="truncate">Tenure & Pre-Check</span>
+                  </div>
+
+                  <div className={`p-2 rounded-lg border flex items-center gap-2 ${
+                    selectedReq.maker_id
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-semibold"
+                      : selectedReq.status === "submitted"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400 font-semibold animate-pulse"
+                      : "bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-500"
+                  }`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      selectedReq.maker_id ? "bg-emerald-500 text-white" : "bg-amber-500 text-slate-950"
+                    }`}>2</span>
+                    <span className="truncate">Maker Scrutiny</span>
+                  </div>
+
+                  <div className={`p-2 rounded-lg border flex items-center gap-2 ${
+                    selectedReq.status === "released"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-semibold"
+                      : selectedReq.status === "under_review"
+                      ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-700 dark:text-indigo-400 font-semibold animate-pulse"
+                      : "bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-500"
+                  }`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      selectedReq.status === "released" ? "bg-emerald-500 text-white" : "bg-indigo-500 text-white"
+                    }`}>3</span>
+                    <span className="truncate">Director Sign-Off</span>
+                  </div>
+                </div>
               </div>
 
               {/* Pre-Checks Checklist */}

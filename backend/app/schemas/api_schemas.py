@@ -58,6 +58,8 @@ class InstrumentOut(BaseModel):
     risk_score: float
     risk_band: str
     days_to_maturity: int
+    lien_marked: Optional[bool] = False
+    joint_holding_confirmed: Optional[bool] = False
 
 class InstrumentCreate(BaseModel):
     institution_id: int
@@ -69,6 +71,8 @@ class InstrumentCreate(BaseModel):
     tenure_days: int
     interest_rate: float
     purpose: Optional[str] = "AICTE Mandatory Security Deposit"
+    lien_marked: Optional[bool] = False
+    joint_holding_confirmed: Optional[bool] = False
 
 class VerifyQRRequest(BaseModel):
     qr_content: str
@@ -87,3 +91,11 @@ class ReleaseDecision(BaseModel):
 
 class AdvanceClockRequest(BaseModel):
     days: int = 30
+
+class FlagActionRequest(BaseModel):
+    remarks: Optional[str] = ""
+
+class ManualVerifyRequest(BaseModel):
+    dispatch_reference: str
+    confirmation_date: str
+    officer_remarks: Optional[str] = ""

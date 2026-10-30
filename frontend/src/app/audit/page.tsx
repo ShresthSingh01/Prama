@@ -35,6 +35,7 @@ export default function AuditLedgerPage() {
   const [verifyResult, setVerifyResult] = useState<AuditVerifyResult | null>(null);
   const [verifying, setVerifying] = useState<boolean>(false);
   const [sabotaging, setSabotaging] = useState<boolean>(false);
+  const [restoring, setRestoring] = useState<boolean>(false);
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
 
   const loadAudit = async () => {
@@ -77,6 +78,20 @@ export default function AuditLedgerPage() {
       console.error(e);
     } finally {
       setSabotaging(false);
+    }
+  };
+
+  const handleRestoreChain = async () => {
+    setRestoring(true);
+    try {
+      await fetchApi<any>("/audit/restore", { method: "POST" });
+      await loadAudit();
+      await handleVerifyChain();
+      window.dispatchEvent(new Event("auditUpdated"));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -124,41 +139,56 @@ export default function AuditLedgerPage() {
         </div>
       </div>
 
-      {/* Verification Status Banner */}
+      {/* Verification Status Banner with Cryptographic Health Orb */}
       {verifyResult && (
-        <div className={`p-4 rounded-xl border text-xs shadow-sm ${
+        <div className={`p-4 rounded-xl border text-xs shadow-sm transition-all ${
           verifyResult.valid 
-            ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-500/40 dark:text-emerald-300" 
-            : "bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/40 dark:border-rose-500/60 dark:text-rose-300 shadow-xl animate-pulse"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-500/40 dark:text-emerald-300 animate-pulse-glow" 
+            : "bg-rose-50 border-rose-300 text-rose-800 dark:bg-rose-950/40 dark:border-rose-500/60 dark:text-rose-300 shadow-xl animate-shake animate-pulse-glow-red"
         }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-bold">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 text-sm font-bold">
+              <div className={`w-3.5 h-3.5 rounded-full ${verifyResult.valid ? "bg-emerald-500 animate-pulse" : "bg-rose-500 animate-ping"}`}></div>
               {verifyResult.valid ? (
                 <>
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                   <span>AUDIT INTEGRITY: 100% UNTOUCHED & AUTHENTIC</span>
                 </>
               ) : (
                 <>
-                  <XCircle className="w-5 h-5 text-rose-600" />
-                  <span>SECURITY ALARM: UNAUTHORIZED AUDIT RECORD MODIFICATION DETECTED!</span>
+                  <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  <span>CRITICAL SECURITY ALARM: UNAUTHORIZED LEDGER MODIFICATION DETECTED!</span>
                 </>
               )}
             </div>
             <span className="font-mono text-[11px] text-slate-500 dark:text-zinc-400">
-              Verified {verifyResult.total_entries || total} Chain Blocks
+              Verified {verifyResult.total_entries || total} Chain Blocks from Genesis
             </span>
           </div>
 
-          <p className="mt-1 text-xs text-slate-700 dark:text-zinc-300 font-mono">
+          <p className="mt-2 text-xs text-slate-700 dark:text-zinc-300 font-mono">
             {verifyResult.valid ? verifyResult.message : verifyResult.reason}
           </p>
 
           {!verifyResult.valid && verifyResult.broken_at_id && (
-            <div className="mt-2 p-2.5 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-500/40 rounded-lg text-[11px] font-mono text-rose-900 dark:text-rose-200">
-              TAMPER LOCATED AT BLOCK ID: #{verifyResult.broken_at_id}. The stored SHA-256 seal failed to match the recomputed hash of its canonical data.
+            <div className="mt-2.5 p-2.5 bg-rose-100 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-500/40 rounded-lg text-[11px] font-mono text-rose-900 dark:text-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                TAMPER LOCATED AT BLOCK ID: #{verifyResult.broken_at_id}. The stored SHA-256 seal failed to match the recomputed hash of its canonical data.
+              </div>
+              <button
+                onClick={handleRestoreChain}
+                disabled={restoring}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md text-xs font-bold transition shadow shrink-0 flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{restoring ? "Reconciling..." : "Reconcile & Restore Chain"}</span>
+              </button>
             </div>
           )}
+
+          <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-zinc-800/60 text-[11px] text-slate-500 dark:text-zinc-400">
+            <strong>PS 26265 Statutory Compliance Guarantee:</strong> Standard SQL database tables can be silently altered by database admins. Prama locks each action to the previous block via sequential SHA-256 hashes (Hash[N] = SHA256(Hash[N-1] + Payload)), producing mathematical proof of non-repudiation.
+          </div>
         </div>
       )}
 
@@ -181,7 +211,7 @@ export default function AuditLedgerPage() {
                   key={entry.id}
                   onClick={() => setSelectedEntry(entry)}
                   className={`p-3.5 rounded-xl border text-xs cursor-pointer transition ${
-                    isBroken ? "bg-rose-100 border-rose-500 text-rose-900 dark:bg-rose-950/60 dark:text-white animate-bounce" :
+                    isBroken ? "bg-rose-100 border-rose-500 text-rose-900 dark:bg-rose-950/60 dark:text-white animate-pulse-glow-red" :
                     isSelected ? "bg-amber-50 border-amber-400 dark:bg-zinc-800 dark:border-emerald-500 text-slate-900 dark:text-white shadow-sm" :
                     "bg-slate-50 border-slate-200 text-slate-700 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-900"
                   }`}

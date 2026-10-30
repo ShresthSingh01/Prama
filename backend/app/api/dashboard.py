@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
-    Instrument, Flag, Verification, ReleaseRequest,
-    InstrumentStatusEnum, TrustTierEnum
+    Instrument, Flag, Verification, ReleaseRequest, Institution,
+    Reminder, ReminderRule, InstrumentStatusEnum, TrustTierEnum
 )
 from backend.app.services.clock_service import get_simulated_now
 
@@ -107,10 +107,9 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
 def get_maturity_timeline(db: Session = Depends(get_db)):
     """Maturity cliff heatmap: aggregated monthly expiry exposure for the next 24 months."""
     instruments = db.query(Instrument).filter(
-        Instrument.status.in_([
-            InstrumentStatusEnum.ACTIVE.value,
-            InstrumentStatusEnum.EXPIRING.value,
-            InstrumentStatusEnum.MATURED.value
+        Instrument.status.notin_([
+            InstrumentStatusEnum.RELEASED.value,
+            InstrumentStatusEnum.RENEWED.value
         ])
     ).all()
     
@@ -196,3 +195,81 @@ def get_act_today_queue(limit: int = 25, db: Session = Depends(get_db)):
             "open_flags_count": len(open_flags)
         })
     return queue
+
+@router.get("/institutions")
+def list_institution_summaries(db: Session = Depends(get_db)):
+    """Computes institution-wise aggregated security deposit records (PS 26265 Item 1)."""
+    institutions = db.query(Institution).options(selectinload(Institution.instruments)).order_by(Institution.name.asc()).all()
+    results = []
+    for inst in institutions:
+        total_corpus = sum(i.amount for i in inst.instruments)
+        active_count = sum(1 for i in inst.instruments if i.status == InstrumentStatusEnum.ACTIVE.value)
+        expiring_count = sum(1 for i in inst.instruments if i.status == InstrumentStatusEnum.EXPIRING.value)
+        matured_count = sum(1 for i in inst.instruments if i.status == InstrumentStatusEnum.MATURED.value)
+        flagged_count = sum(1 for i in inst.instruments if i.status == InstrumentStatusEnum.FLAGGED.value)
+        released_count = sum(1 for i in inst.instruments if i.status == InstrumentStatusEnum.RELEASED.value)
+        results.append({
+            "id": inst.id,
+            "aicte_id": inst.aicte_id,
+            "name": inst.name,
+            "state": inst.state,
+            "district": inst.district,
+            "email": inst.email,
+            "phone": inst.phone,
+            "compliance_score": inst.compliance_score,
+            "total_instruments": len(inst.instruments),
+            "total_corpus": total_corpus,
+            "total_corpus_lakhs": round(total_corpus / 100000.0, 2),
+            "total_corpus_cr": round(total_corpus / 10000000.0, 2),
+            "active_count": active_count,
+            "expiring_count": expiring_count,
+            "matured_count": matured_count,
+            "flagged_count": flagged_count,
+            "released_count": released_count
+        })
+    return results
+
+@router.get("/reminders")
+def list_statutory_reminders(db: Session = Depends(get_db)):
+    """Returns fired automated reminder and escalation notices (PS 26265 Items 4 & 7)."""
+    from backend.app.services.slm_tasks import generate_hindi_reminder_draft
+
+    reminders = db.query(Reminder).options(
+        joinedload(Reminder.instrument).joinedload(Instrument.institution),
+        joinedload(Reminder.rule)
+    ).order_by(Reminder.id.desc()).limit(100).all()
+
+    items = []
+    for r in reminders:
+        inst = r.instrument
+        college_name = inst.institution.name if inst and inst.institution else "Technical Institute"
+        fdr_num = inst.fdr_number if inst else "N/A"
+        amt = inst.amount if inst else 0.0
+        mat_date = inst.maturity_date if inst else "N/A"
+        rule_name = r.rule.name if r.rule else f"Level {r.level} Statutory Notice"
+        
+        # Safe Hindi notice draft with guaranteed fidelity
+        try:
+            hindi_draft = generate_hindi_reminder_draft(
+                f"Statutory Notice: Fixed Deposit {fdr_num} of Rs {amt:,.2f} matures on {mat_date}."
+            )
+        except Exception:
+            hindi_draft = f"सांविधिक सूचना: सावधि जमा (FDR) {fdr_num} राशि ₹{amt:,.2f} की परिपक्वता तिथि {mat_date} है।"
+
+        items.append({
+            "id": r.id,
+            "instrument_id": r.instrument_id,
+            "institution_name": college_name,
+            "fdr_number": fdr_num,
+            "amount": amt,
+            "amount_lakhs": round(amt / 100000.0, 2),
+            "maturity_date": mat_date,
+            "rule_name": rule_name,
+            "level": r.level,
+            "channel": r.channel,
+            "status": r.status,
+            "sent_at": r.sent_at.strftime("%Y-%m-%d %H:%M") if r.sent_at else "",
+            "hindi_draft": hindi_draft
+        })
+    return items
+

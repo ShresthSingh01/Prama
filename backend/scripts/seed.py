@@ -46,9 +46,10 @@ STATES_DISTRICTS = [
 COLLEGE_PREFIXES = ["National", "Apex", "Bharati", "St. Xavier's", "Swami Vivekananda", "Rajiv Gandhi", "Dr. B.R. Ambedkar", "Indira Gandhi", "Shri Ram", "Vidyapeeth"]
 COLLEGE_TYPES = ["Institute of Technology", "College of Engineering", "Polytechnic College", "Institute of Management & Tech", "School of Computer Applications"]
 
-def seed_database():
+def seed_database(drop_existing: bool = False):
     print("[*] Initializing Database Schema...")
-    Base.metadata.drop_all(bind=engine)
+    if drop_existing:
+        Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     
     db: Session = SessionLocal()

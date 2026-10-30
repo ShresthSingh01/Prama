@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: prama-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:////app/backend/fdr_sentinel.db
+      - SECRET_KEY=${SECRET_KEY:-aicte_fdr_sentinel_super_secret_jwt_key_2026_sih}
+      - DEMO_MODE=${DEMO_MODE:-true}
+      - LLM_PROVIDER=${LLM_PROVIDER:-auto}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3-flash-preview}
+      - SLM_BASE_URL=${SLM_BASE_URL:-http://host.docker.internal:11434}
+      - SLM_ENABLED=${SLM_ENABLED:-true}
+    volumes:
+      - prama_storage:/app/backend/storage_vault
+      - prama_data:/app/backend
+    networks:
+      - prama-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    container_name: prama-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      - backend
+    networks:
+      - prama-network
+
+volumes:
+  prama_storage:
+  prama_data:
+
+networks:
+  prama-network:
+    driver: bridge
+

@@ -170,12 +170,21 @@ def get_bank_verify_data(token: str, db: Session = Depends(get_db)):
     inst = ver.instrument
     return {
         "institution_name": inst.institution.name,
+        "institution_aicte_id": inst.institution.aicte_id,
+        "institution_state": inst.institution.state,
+        "institution_district": inst.institution.district,
         "fdr_number": inst.fdr_number,
         "bank_name": inst.bank.name,
+        "bank_ifsc": inst.bank.ifsc_prefix,
         "amount": inst.amount,
+        "amount_lakhs": round(inst.amount / 100000.0, 2),
         "issue_date": inst.issue_date,
         "maturity_date": inst.maturity_date,
-        "status": ver.result
+        "tenure_days": inst.tenure_days,
+        "status": ver.result,
+        "responded_at": ver.responded_at.strftime("%Y-%m-%d %H:%M UTC") if ver.responded_at else None,
+        "responder_email": ver.responder_email,
+        "expires_at": ver.expires_at.strftime("%Y-%m-%d %H:%M UTC") if ver.expires_at else None
     }
 
 @router.post("/bank-verify/{token}")

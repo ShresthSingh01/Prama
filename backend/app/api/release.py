@@ -66,6 +66,92 @@ def submit_release_request(
     
     return {"success": True, "release_request_id": rel.id, "status": rel.status}
 
+@router.post("/release-requests/seed-sample")
+def seed_sample_release_request(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """
+    Finds or creates a compliant, matured, bank-confirmed FDR instrument
+    meeting all AICTE Clause 6.46 pre-conditions and creates a fresh pending release request.
+    """
+    from backend.app.models.entities import Document
+    from backend.app.services.clock_service import get_simulated_now
+
+    sim_now = get_simulated_now(db)
+    
+    candidates = db.query(Instrument).filter(
+        Instrument.status.in_([InstrumentStatusEnum.MATURED.value, InstrumentStatusEnum.OVERDUE.value, InstrumentStatusEnum.ACTIVE.value]),
+        Instrument.trust_tier == TrustTierEnum.BANK_CONFIRMED.value
+    ).all()
+    
+    target_inst = None
+    for cand in candidates:
+        r = evaluate_release_readiness(db, cand)
+        if r["is_ready"]:
+            existing_req = db.query(ReleaseRequest).filter(
+                ReleaseRequest.instrument_id == cand.id,
+                ReleaseRequest.status.in_(["submitted", "under_review"])
+            ).first()
+            if not existing_req:
+                target_inst = cand
+                break
+
+    if not target_inst:
+        import time
+        target_inst = Instrument(
+            institution_id=1,
+            bank_id=1,
+            fdr_number=f"DEMO-READY-{int(time.time()) % 100000}",
+            amount=1500000.0,
+            issue_date="2016-01-15",
+            maturity_date="2026-01-15",
+            tenure_days=3652,
+            interest_rate=7.25,
+            purpose="AICTE Statutory Security Deposit (Demo Release Case)",
+            status=InstrumentStatusEnum.MATURED.value,
+            trust_tier=TrustTierEnum.BANK_CONFIRMED.value,
+            lien_marked=True,
+            joint_holding_confirmed=True
+        )
+        db.add(target_inst)
+        db.commit()
+        db.refresh(target_inst)
+        
+        doc = Document(
+            instrument_id=target_inst.id,
+            kind="FDR_RECEIPT",
+            storage_key=f"receipt_{target_inst.id}.pdf",
+            sha256="demo_compliant_receipt_sha256"
+        )
+        db.add(doc)
+        db.commit()
+
+    rel = ReleaseRequest(
+        instrument_id=target_inst.id,
+        requested_by=current_user.id if current_user else 1,
+        reason="10-Year Statutory Lock-in Completed. Zero encumbrances, Extension of Approval cleared.",
+        status="submitted"
+    )
+    target_inst.status = InstrumentStatusEnum.RELEASE_REQUESTED.value
+    db.add(rel)
+    db.commit()
+    db.refresh(rel)
+
+    log_audit_entry(db, "SUBMIT_RELEASE_REQUEST", "release_request", rel.id, {
+        "instrument_id": target_inst.id,
+        "fdr_number": target_inst.fdr_number,
+        "is_sample_demo": True
+    }, current_user.id if current_user else 1, current_user.role if current_user else "institution_admin")
+
+    return {
+        "success": True,
+        "release_request_id": rel.id,
+        "instrument_id": target_inst.id,
+        "fdr_number": target_inst.fdr_number,
+        "message": f"Sample release request #{rel.id} created for compliant FDR #{target_inst.fdr_number}."
+    }
+
 @router.get("/release-requests")
 def list_release_requests(db: Session = Depends(get_db)):
     requests = (

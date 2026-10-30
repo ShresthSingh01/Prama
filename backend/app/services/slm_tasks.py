@@ -270,16 +270,63 @@ def parse_natural_language_search(query: str, client: Optional[LLMClient] = None
         # Parse through Pydantic allowlist validator (automatically drops unauthorized keys)
         return NLSearchFilter.model_validate(raw_filter)
     except Exception as e:
-        logger.warning(f"NL search parsing error: {e}. Returning default filter.")
-        # Rule-based fallback if offline
+        logger.warning(f"NL search parsing error: {e}. Returning rule-based filter.")
+        # Rule-based fallback if offline or parsing error
         q = query.lower()
-        days_m = re.search(r"(\d+)\s*days?", q)
-        lakh_m = re.search(r"(\d+)\s*lakh", q)
         f = NLSearchFilter()
+        days_m = re.search(r"(\d+)\s*days?", q)
         if days_m:
             f.maturity_within_days = int(days_m.group(1))
-        if lakh_m:
-            f.min_amount = float(lakh_m.group(1)) * 100000
+
+        # Amount parsing
+        above_m = re.search(r"(?:above|over|more than|greater than|>=?)\s*(\d+(\.\d+)?)\s*lakh", q)
+        if above_m:
+            f.min_amount = float(above_m.group(1)) * 100000
+        else:
+            lakh_m = re.search(r"(\d+(\.\d+)?)\s*lakh", q)
+            if lakh_m:
+                f.min_amount = float(lakh_m.group(1)) * 100000
+
+        below_m = re.search(r"(?:below|under|less than|<=?)\s*(\d+(\.\d+)?)\s*lakh", q)
+        if below_m:
+            f.max_amount = float(below_m.group(1)) * 100000
+
+        # Status parsing
+        if "matured" in q or "mature" in q:
+            f.status = ["MATURED"]
+        elif "verified" in q:
+            f.status = ["VERIFIED"]
+        elif "active" in q:
+            f.status = ["ACTIVE"]
+        elif "released" in q:
+            f.status = ["RELEASED"]
+
+        # Bank parsing
+        if "sbi" in q or "state bank" in q:
+            f.bank = "State Bank of India"
+        elif "pnb" in q or "punjab" in q:
+            f.bank = "Punjab National Bank"
+        elif "canara" in q:
+            f.bank = "Canara Bank"
+        elif "axis" in q:
+            f.bank = "Axis Bank"
+        elif "hdfc" in q:
+            f.bank = "HDFC Bank"
+        elif "icici" in q:
+            f.bank = "ICICI Bank"
+
+        # Trust tier
+        if "bank confirmed" in q or "confirmed" in q:
+            f.trust_tier = "BANK_CONFIRMED"
+
+        # Open flags
         if "flag" in q:
             f.has_open_flags = True
+
+        # State parsing
+        for state in ["maharashtra", "delhi", "karnataka", "tamil nadu", "gujarat", "uttar pradesh"]:
+            if state in q:
+                f.state = state.title()
+                break
+
         return f

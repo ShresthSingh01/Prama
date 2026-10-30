@@ -110,6 +110,8 @@ class Instrument(Base):
     risk_score = Column(Float, default=0.0)
     risk_band = Column(String(20), default="LOW")
     parent_instrument_id = Column(Integer, ForeignKey("instruments.id"), nullable=True)
+    lien_marked = Column(Boolean, default=False, nullable=True)
+    joint_holding_confirmed = Column(Boolean, default=False, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     institution = relationship("Institution", back_populates="instruments")
@@ -230,6 +232,7 @@ class Reminder(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     instrument = relationship("Instrument", back_populates="reminders")
+    rule = relationship("ReminderRule")
 
 class ReleaseRequest(Base):
     __tablename__ = "release_requests"

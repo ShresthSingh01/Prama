@@ -8,7 +8,7 @@ from backend.app.models import entities  # Ensure models are loaded
 from backend.app.api import (
     auth, instruments, verification, release,
     dashboard, graph, audit, demo, mock_bank, evaluation,
-    slm, knowledge_api, copilot, reports
+    slm, knowledge_api, copilot, reports, flags
 )
 
 # Auto-create tables if they don't exist
@@ -54,6 +54,23 @@ app.include_router(slm.router, prefix=settings.API_V1_PREFIX)
 app.include_router(knowledge_api.router, prefix=settings.API_V1_PREFIX)
 app.include_router(copilot.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(flags.router, prefix=settings.API_V1_PREFIX)
+
+@app.on_event("startup")
+def on_startup():
+    from backend.app.models.database import SessionLocal
+    from backend.app.models.entities import User
+    db = SessionLocal()
+    try:
+        if db.query(User).count() == 0:
+            print("[*] Database is empty. Running initial statutory seed for AICTE FDR Portal...")
+            from backend.scripts.seed import seed_database
+            seed_database(drop_existing=False)
+            print("[✓] Initial seed completed successfully.")
+    except Exception as e:
+        print(f"[!] Startup seed check: {e}")
+    finally:
+        db.close()
 
 @app.get("/health")
 def health_check():

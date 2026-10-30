@@ -7,7 +7,7 @@ import {
   ShieldCheck, Clock, RotateCcw, 
   BarChart3, ListFilter, Network, FileCheck2, FileText, Activity,
   Lock, CheckCircle2, XCircle, BookOpen, Sparkles, Sun, Moon,
-  HelpCircle
+  HelpCircle, ChevronDown, Bell, AlertCircle, X
 } from "lucide-react";
 import { fetchApi, setAuthSession, getCurrentUser, getAuthToken } from "@/lib/api";
 import { useTheme } from "./ThemeProvider";
@@ -37,6 +37,16 @@ export default function Navigation() {
   const [copilotOpen, setCopilotOpen] = useState<boolean>(false);
   const [copilotQuestion, setCopilotQuestion] = useState<string>("");
   const [walkthroughOpen, setWalkthroughOpen] = useState<boolean>(false);
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [remindersOpen, setRemindersOpen] = useState<boolean>(false);
+  const [expandedHindiId, setExpandedHindiId] = useState<number | null>(null);
+
+  const refreshReminders = async () => {
+    try {
+      const data = await fetchApi<any[]>("/dashboard/reminders");
+      setReminders(data || []);
+    } catch {}
+  };
 
   const loginAsRole = async (roleKey: string) => {
     const creds = ROLE_CREDENTIALS[roleKey];
@@ -85,10 +95,15 @@ export default function Navigation() {
     }
     refreshClock();
     refreshAudit();
-    const interval = setInterval(refreshClock, 10000);
+    refreshReminders();
+    const interval = setInterval(() => {
+      refreshClock();
+      refreshReminders();
+    }, 10000);
     const handleUpdate = () => {
       refreshClock();
       refreshAudit();
+      refreshReminders();
     };
     const handleOpenCopilot = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -137,18 +152,45 @@ export default function Navigation() {
     }
   };
 
-  // Plain-Language Navigation Items
-  const navItems = [
-    { label: "Dashboard", href: "/", icon: BarChart3, desc: "Overview & key metrics" },
-    { label: "Action Queue", href: "/queue", icon: ListFilter, desc: "FDRs needing review" },
-    { label: "Deposit Inspector", href: "/inspector/1", icon: ShieldCheck, desc: "Certificate & AI analysis" },
-    { label: "Release Approvals", href: "/release", icon: FileCheck2, desc: "Dual-officer approval" },
-    { label: "Risk Network", href: "/graph", icon: Network, desc: "Visual fraud detection map" },
-    { label: "Rules & Policies", href: "/knowledge", icon: BookOpen, desc: "AICTE regulations" },
-    { label: "Audit Trail", href: "/audit", icon: Lock, desc: "Tamper-proof logs" },
-    { label: "System Quality", href: "/evaluation", icon: Activity, desc: "Accuracy benchmarks" },
-    { label: "New Deposit", href: "/submit", icon: FileText, desc: "Register certificate" },
+  // Primary PS 26265 Navigation Items (Role-Aware)
+  const isInstitutionRole = currentUser?.role === "institution_admin" || activeRole === "institute";
+
+  interface NavItem {
+    label: string;
+    href: string;
+    icon: any;
+    desc: string;
+    badge?: string;
+  }
+
+  const officerNavItems: NavItem[] = [
+    { label: "Dashboard", href: "/", icon: BarChart3, desc: "Overview & regulatory metrics" },
+    { label: "Pending Actions", href: "/queue", icon: ListFilter, desc: "FDRs needing regulatory review" },
+    { label: "Duplicate & Fraud Detection", href: "/graph", icon: Network, desc: "Visual fraud detection map (Collusion Rings)", badge: "5 Rings" },
+    { label: "Submit FDR / Security Deposit", href: "/submit", icon: FileText, desc: "Register certificate" },
+    { label: "Deposit Release & Refund", href: "/release", icon: FileCheck2, desc: "Dual-officer approval" },
+    { label: "Activity & Audit Log", href: "/audit", icon: Lock, desc: "Tamper-proof logs" },
   ];
+
+  const institutionNavItems: NavItem[] = [
+    { label: "My Deposits", href: "/", icon: BarChart3, desc: "College security deposits overview" },
+    { label: "Submit FDR / Security Deposit", href: "/submit", icon: FileText, desc: "Submit new or renewed FDR" },
+    { label: "Deposit Release & Refund", href: "/release", icon: FileCheck2, desc: "Request deposit release" },
+    { label: "AICTE Regulations", href: "/knowledge", icon: BookOpen, desc: "Approval Process Guidelines" },
+  ];
+
+  const primaryNavItems = isInstitutionRole ? institutionNavItems : officerNavItems;
+
+  const toolsNavItems = [
+    { label: "AICTE Regulations & Handbooks", href: "/knowledge", icon: BookOpen, desc: "AICTE regulations" },
+    { label: "System Benchmarks", href: "/evaluation", icon: Activity, desc: "Accuracy benchmarks" },
+  ];
+
+  const [toolsOpen, setToolsOpen] = useState(false);
+
+  if (pathname?.startsWith("/bank-verify")) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur border-b border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-100 transition-colors duration-200">
@@ -157,13 +199,15 @@ export default function Navigation() {
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-1.5 font-semibold tracking-wide text-slate-800 dark:text-zinc-200">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            AICTE SECURITY DEPOSIT BUREAU
+            AICTE REGULATION BUREAU <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">PS 26265</span>
             <span className="text-slate-400 dark:text-zinc-500 font-normal">| Prama</span>
           </div>
           
           {/* Simulated Time Machine Controls */}
-          <div className="flex items-center gap-2 bg-white dark:bg-zinc-950 px-2.5 py-0.5 rounded-md border border-slate-200 dark:border-zinc-700 shadow-sm">
+          <div className="flex items-center gap-2 bg-white dark:bg-zinc-950 px-2.5 py-0.5 rounded-md border border-slate-200 dark:border-zinc-700 shadow-sm" title="Maturity Time Machine — Simulate future dates to trigger expiry alerts">
             <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+            <span className="text-amber-600 dark:text-amber-400 font-semibold text-[10px] uppercase tracking-wide hidden md:inline">Time Machine</span>
+            <span className="text-slate-500 dark:text-zinc-400 hidden md:inline">·</span>
             <span className="text-slate-500 dark:text-zinc-400">Date:</span>
             <span className="font-mono font-medium text-amber-600 dark:text-amber-300">{clockData.simulated_date}</span>
             {clockData.offset_days > 0 && (
@@ -210,6 +254,22 @@ export default function Navigation() {
                 </button>
               )}
             </div>
+
+            {/* Automated Alerts Bell (PS 26265 Item 4 & 7) */}
+            <div className="h-3 w-px bg-slate-200 dark:bg-zinc-700 mx-0.5"></div>
+            <button
+              onClick={() => setRemindersOpen(true)}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-[11px] font-semibold transition"
+              title="Statutory Alerts & Escalation Ladder"
+            >
+              <Bell className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden sm:inline">Alerts</span>
+              {reminders.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white font-mono text-[10px] font-bold">
+                  {reminders.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -228,7 +288,7 @@ export default function Navigation() {
               </>
             ) : (
               <>
-                <XCircle className="w-3.5 h-3.5 text-rose-500 animate-bounce" />
+                <XCircle className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
                 <span className="text-rose-600 dark:text-rose-400 font-bold font-mono text-[11px]">Audit Break Detected!</span>
               </>
             )}
@@ -275,11 +335,12 @@ export default function Navigation() {
           </Link>
         </div>
 
-        {/* Center: Scrollable Navigation Links (Isolated Flex Area) */}
-        <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar scroll-smooth flex items-center gap-1 px-2">
-          {navItems.map((item) => {
+        {/* Center: Clean Primary Navigation Links + Tools Dropdown */}
+        <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar scroll-smooth flex items-center gap-1.5 px-2">
+          {primaryNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+
             return (
               <Link
                 key={item.href}
@@ -293,9 +354,62 @@ export default function Navigation() {
               >
                 <Icon className="w-3.5 h-3.5 shrink-0" />
                 <span>{item.label}</span>
+                {item.badge && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
+
+          {/* Tools & Analytics Dropdown (Officers only) */}
+          {!isInstitutionRole && (
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setToolsOpen(!toolsOpen)}
+                onBlur={() => setTimeout(() => setToolsOpen(false), 200)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                  toolsNavItems.some(t => pathname.startsWith(t.href))
+                    ? "bg-amber-500/15 text-amber-800 dark:bg-zinc-800 dark:text-white border border-amber-500/30 dark:border-zinc-700 shadow-sm"
+                    : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900"
+                }`}
+              >
+                <span>More Tools</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${toolsOpen ? "rotate-180" : ""}`} />
+              </button>
+              {toolsOpen && (
+                <div className="absolute left-0 top-full mt-1.5 w-52 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-50 animate-in fade-in zoom-in-95">
+                  {toolsNavItems.map((tool) => {
+                    const ToolIcon = tool.icon;
+                    const isToolActive = pathname.startsWith(tool.href);
+                    if (pathname?.startsWith("/bank-verify")) {
+    return null;
+  }
+
+  return (
+                      <Link
+                        key={tool.href}
+                        href={tool.href}
+                        onClick={() => setToolsOpen(false)}
+                        className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition ${
+                          isToolActive
+                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold"
+                            : "text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                        }`}
+                      >
+                        <ToolIcon className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
+                        <div>
+                          <div>{tool.label}</div>
+                          <div className="text-[10px] text-slate-400 dark:text-zinc-500">{tool.desc}</div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Action Buttons */}
@@ -336,6 +450,99 @@ export default function Navigation() {
         isOpen={walkthroughOpen}
         onClose={() => setWalkthroughOpen(false)}
       />
+
+      {/* Statutory Alerts & Escalation Ladder Drawer (PS 26265 Item 4 & 7) */}
+      {remindersOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex justify-end">
+          <div className="bg-white dark:bg-zinc-900 border-l border-slate-200 dark:border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
+            {/* Drawer Header */}
+            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50 dark:bg-zinc-950">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Statutory Alerts & Escalation Center
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    AICTE PS 26265 Item 4 & 7 • Automated Reminders Ladder
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRemindersOpen(false)}
+                className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Reminders List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {reminders.length === 0 ? (
+                <div className="text-center py-16 text-slate-400 text-xs">
+                  <Clock className="w-10 h-10 mx-auto mb-3 opacity-40 text-amber-500" />
+                  <p className="font-semibold text-slate-700 dark:text-zinc-300">No Active Escalation Notices</p>
+                  <p className="mt-1 text-slate-500 dark:text-zinc-400 max-w-xs mx-auto">
+                    Use the simulated Time Machine (+30d, +60d, +90d) in the top bar to trigger upcoming maturity notices and overdue escalations.
+                  </p>
+                </div>
+              ) : (
+                reminders.map((r) => (
+                  <div
+                    key={r.id}
+                    className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950/60 shadow-sm space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                        {r.rule_name}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {r.channel} • {r.sent_at}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-white">
+                        {r.institution_name}
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 mt-0.5">
+                        FDR #{r.fdr_number} • ₹{r.amount_lakhs} Lakhs • Matures {r.maturity_date}
+                      </div>
+                    </div>
+
+                    {/* Bilingual Notice Toggle */}
+                    <div className="pt-1 border-t border-slate-100 dark:border-zinc-800/80">
+                      <button
+                        onClick={() => setExpandedHindiId(expandedHindiId === r.id ? null : r.id)}
+                        className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                      >
+                        {expandedHindiId === r.id ? "Hide Bilingual Notice" : "View Hindi / English Notice Draft"}
+                      </button>
+                      {expandedHindiId === r.id && (
+                        <div className="mt-2 p-2.5 rounded-lg bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-[11px] space-y-1.5 font-sans">
+                          <div className="text-slate-800 dark:text-zinc-200 font-medium leading-relaxed">
+                            {r.hindi_draft}
+                          </div>
+                          <div className="text-[10px] text-slate-400 border-t border-slate-200 dark:border-zinc-800 pt-1">
+                            Dispatched via {r.channel} to Institution Principal & Regional Officer.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 border-t border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-center text-[10px] text-slate-500 font-mono">
+              AICTE Escalation Ladder: T-90 (Email) ➔ T-60 (Email) ➔ T-30 (SMS+Email) ➔ Overdue +1 (Scrutiny Alert)
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

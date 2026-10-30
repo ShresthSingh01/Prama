@@ -91,18 +91,30 @@ def extract_from_document(file_path: str) -> Dict[str, Any]:
     if raw_text.strip():
         text_clean = raw_text
 
-        # 1. FDR Number extraction
+        # 1. FDR Number extraction - Prioritize structured bank serials & filter stop words
+        STOP_WORDS = {
+            "CERTIFICATE", "DEPOSIT", "RECEIPT", "ADVICE", "STATEMENT", 
+            "NUMBER", "CONFIRMATION", "VERIFICATION", "MEMORANDUM", 
+            "ACKNOWLEDGMENT", "UNDERTAKING", "AFFIDAVIT", "FIXED", "OFFICIAL"
+        }
         fdr_patterns = [
-            r'(?:FDR\s*No|FDR\s*Number|Deposit Receipt|Receipt No|A/c No|Certificate No|FDR REF|FDR)[\s.:#-]+([A-Z0-9\/-]{6,30})',
-            r'\b([A-Z]{4}\/\d{4}\/[A-Z0-9-]+)\b',
+            r'\b([A-Z]{3,4}\/\d{4}\/[A-Z0-9-]+)\b',
             r'\b([A-Z]{3,4}-\d{4}-[A-Z0-9-]+)\b',
-            r'\b(FDR-[A-Z0-9-]+)\b'
+            r'\b(FDR-[A-Z0-9-]+)\b',
+            r'(?:FDR\s*(?:No|Num|Number|Ref|Id|Code)|Deposit Receipt No|Receipt No|Certificate No)[\s.:#-]+([A-Z0-9\/-]{6,30})',
+            r'(?:FDR|Receipt)[\s.:#-]+([A-Z0-9\/-]{6,30})'
         ]
         for pat in fdr_patterns:
-            m = re.search(pat, text_clean, re.IGNORECASE)
-            if m:
-                extracted_fields["fdr_number"] = m.group(1).strip()
+            matches = re.finditer(pat, text_clean, re.IGNORECASE)
+            for m in matches:
+                cand = m.group(1).strip()
+                # Exclude header words and require at least one numeric digit in the serial
+                if cand.upper() in STOP_WORDS or not re.search(r'\d', cand):
+                    continue
+                extracted_fields["fdr_number"] = cand
                 field_confidence["fdr_number"] = 0.95
+                break
+            if extracted_fields["fdr_number"]:
                 break
 
         # 2. Deposit Amount extraction

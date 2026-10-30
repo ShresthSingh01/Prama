@@ -5,7 +5,7 @@ from sqlalchemy import text
 from backend.app.main import app
 from backend.app.models.database import SessionLocal
 from backend.app.models.entities import Instrument, Bank, Institution, User, Flag, ReleaseRequest, AuditLog, Document, Verification
-from backend.app.services.audit_service import verify_audit_chain, log_audit_entry
+from backend.app.services.audit_service import verify_audit_chain, log_audit_entry, invalidate_audit_cache
 
 client = TestClient(app)
 
@@ -195,6 +195,11 @@ def test_08_tamper_evident_audit_break():
     """Verify audit chain passes; after sabotage, verify fails and pinpoints tampered block."""
     db: Session = SessionLocal()
     try:
+        # Pre-cleanup in case a previous run or demo left broken state
+        repair_res = client.post("/api/v1/audit/restore").json()
+        assert repair_res["success"] is True
+        assert repair_res["verification"]["valid"] is True
+
         # Create a dedicated entry for sabotage test
         test_entry = log_audit_entry(db, "TEST_INTEGRITY_CHECK", "test", 9999, {"amount": 500000.0})
         entry_id = test_entry.id
@@ -213,9 +218,12 @@ def test_08_tamper_evident_audit_break():
         assert verify_after["broken_at_id"] == entry_id
         assert "tampering detected" in verify_after["reason"].lower()
         
-        # 4. Clean up test entry so subsequent tests remain pristine
+        # 4. Self-healing restore cleans residue and restores chain to 100% valid
         db.query(AuditLog).filter(AuditLog.id == entry_id).delete()
         db.commit()
+        restore_res = client.post("/api/v1/audit/restore").json()
+        assert restore_res["success"] is True
+        assert restore_res["verification"]["valid"] is True
     finally:
         db.close()
 
@@ -518,3 +526,157 @@ def test_16_statutory_reports_csv_export():
     assert r4.status_code == 200
     assert "text/csv" in r4.headers["content-type"]
     assert "primary_intervention_reason" in r4.text
+
+def test_17_deficiency_notice_and_lien_fields():
+    """PS 26265 Statutory Deficiency Notice PDF generation and Lien confirmation fields."""
+    # 1. Test downloading statutory deficiency notice PDF
+    res = client.get("/api/v1/instruments/1/deficiency-notice")
+    assert res.status_code == 200
+    assert "application/pdf" in res.headers["content-type"]
+    assert res.content.startswith(b"%PDF-")
+
+    # 2. Test instrument creation with lien & joint holding
+    token = client.post("/api/v1/auth/login", json={"email": "maker@aicte.gov.in", "password": "Password@123"}).json()["access_token"]
+    create_payload = {
+        "institution_id": 1,
+        "bank_id": 1,
+        "fdr_number": "SBIN/2026/TEST-LIEN-001",
+        "amount": 1500000.0,
+        "issue_date": "2026-01-01",
+        "maturity_date": "2036-01-01",
+        "tenure_days": 3652,
+        "interest_rate": 7.25,
+        "purpose": "AICTE Mandatory Security Deposit",
+        "lien_marked": True,
+        "joint_holding_confirmed": True
+    }
+    c_res = client.post("/api/v1/instruments", json=create_payload, headers={"Authorization": f"Bearer {token}"})
+    assert c_res.status_code == 200
+    new_id = c_res.json()["id"]
+
+    # 3. Verify retrieved detail contains confirmed lien & joint holding
+    detail_res = client.get(f"/api/v1/instruments/{new_id}", headers={"Authorization": f"Bearer {token}"})
+    assert detail_res.status_code == 200
+    d = detail_res.json()
+    assert d["lien_marked"] is True
+    assert d["joint_holding_confirmed"] is True
+
+    # 4. Generate deficiency notice on new instrument
+    notice_res = client.get(f"/api/v1/instruments/{new_id}/deficiency-notice", headers={"Authorization": f"Bearer {token}"})
+    assert notice_res.status_code == 200
+    assert notice_res.content.startswith(b"%PDF-")
+
+def test_18_bank_verify_portal_and_dashboard_institutions():
+    """PS 26265 Item 1 & 3: Institution directory, reminders, lineage, and external bank verify portal."""
+    # 1. Institutions Directory endpoint
+    res_inst = client.get("/api/v1/dashboard/institutions")
+    assert res_inst.status_code == 200
+    institutions = res_inst.json()
+    assert len(institutions) > 0
+    assert "total_corpus" in institutions[0]
+    assert "compliance_score" in institutions[0]
+    assert "aicte_id" in institutions[0]
+
+    # 2. Reminders endpoint
+    res_rem = client.get("/api/v1/dashboard/reminders")
+    assert res_rem.status_code == 200
+    reminders = res_rem.json()
+    assert isinstance(reminders, list)
+
+    # 3. Lineage in Instrument Detail
+    res_detail = client.get("/api/v1/instruments/1")
+    assert res_detail.status_code == 200
+    d = res_detail.json()
+    assert "lineage" in d
+    assert "parent" in d["lineage"]
+    assert "renewals" in d["lineage"]
+
+    # 4. Bank Verify Data endpoint
+    link_res = client.post("/api/v1/instruments/1/verify/link")
+    assert link_res.status_code == 200
+    token = link_res.json()["token"]
+
+    portal_res = client.get(f"/api/v1/bank-verify/{token}")
+    assert portal_res.status_code == 200
+    p = portal_res.json()
+    assert "institution_name" in p
+    assert "institution_aicte_id" in p
+    assert "fdr_number" in p
+    assert "amount" in p
+    assert "bank_ifsc" in p
+
+def test_19_nl_search_flag_resolution_and_manual_verify():
+    """PS 26265 Item 2, 4 & 6: NL smart search, flag resolution & dismissal, and manual bank attestation."""
+    # 1. Natural Language Smart Search
+    nl_res = client.post("/api/v1/search/nl", json={"query": "matured SBI deposits above 10 lakh"})
+    assert nl_res.status_code == 200
+    nl_data = nl_res.json()
+    assert "results" in nl_data
+    assert "filter" in nl_data
+    if len(nl_data["results"]) > 0:
+        row = nl_data["results"][0]
+        assert "id" in row
+        assert "institution_name" in row
+        assert "bank_name" in row
+        assert "amount" in row
+        assert "maturity_date" in row
+        assert "status" in row
+        assert "trust_tier" in row
+        assert "risk_score" in row
+        assert "risk_band" in row
+
+    # 2. Flag Resolution and Dismissal
+    db = SessionLocal()
+    flag = db.query(Flag).filter(Flag.status == "open").first()
+    if not flag:
+        # Create an open flag to test
+        flag = Flag(
+            instrument_id=1,
+            code="TEST_DISCREPANCY_FLAG",
+            severity="MEDIUM",
+            explanation="Test regulatory discrepancy flag for resolution test.",
+            status="open"
+        )
+        db.add(flag)
+        db.commit()
+        db.refresh(flag)
+
+    flag_id = flag.id
+    resolve_res = client.post(f"/api/v1/flags/{flag_id}/resolve", json={
+        "remarks": "Institution submitted certified clarification letter from bank manager."
+    })
+    assert resolve_res.status_code == 200
+    assert resolve_res.json()["status"] == "resolved"
+    assert resolve_res.json()["success"] is True
+
+    # Test Dismissal
+    flag2 = Flag(
+        instrument_id=1,
+        code="TEST_FALSE_POSITIVE_FLAG",
+        severity="LOW",
+        explanation="Test false positive flag.",
+        status="open"
+    )
+    db.add(flag2)
+    db.commit()
+    db.refresh(flag2)
+
+    dismiss_res = client.post(f"/api/v1/flags/{flag2.id}/dismiss", json={
+        "remarks": "False positive: verified by scrutiny officer against regulatory record."
+    })
+    assert dismiss_res.status_code == 200
+    assert dismiss_res.json()["status"] == "dismissed"
+
+    # 3. Manual Bank Attestation Channel (Speed Post)
+    manual_res = client.post("/api/v1/instruments/1/verify/manual", json={
+        "dispatch_reference": "SPEED-POST-ED556677889IN",
+        "confirmation_date": "2026-10-30",
+        "officer_remarks": "Branch Manager official letter verified under official seal."
+    })
+    assert manual_res.status_code == 200
+    m_data = manual_res.json()
+    assert m_data["success"] is True
+    assert m_data["trust_tier"] == "BANK_CONFIRMED"
+    assert "verification_id" in m_data
+
+
