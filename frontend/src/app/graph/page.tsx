@@ -33,6 +33,7 @@ interface RawNode {
   risk?: string;
   size?: number;
   sha256?: string;
+  instrument_id?: number;
 }
 
 interface RawLink {
@@ -616,7 +617,7 @@ export default function GraphPage() {
 
               {selectedNode.type === "fdr" && (
                 <Link
-                  href={`/inspector/1`}
+                  href={selectedNode.instrument_id ? `/inspector/${selectedNode.instrument_id}` : `/inspector/1`}
                   className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-amber-500 dark:hover:bg-amber-400 dark:text-slate-950 rounded-lg font-bold text-xs transition shadow-sm"
                 >
                   <Eye className="w-3.5 h-3.5" />

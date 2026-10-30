@@ -37,7 +37,7 @@ while ($count -lt $maxRetries) {
         $res = Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get -TimeoutSec 2 -ErrorAction Stop
         if ($res.status -eq "healthy") {
             $isHealthy = $true
-            Write-Host "[✓] Backend is online and healthy!" -ForegroundColor Green
+            Write-Host "[+] Backend is online and healthy!" -ForegroundColor Green
             break
         }
     } catch {

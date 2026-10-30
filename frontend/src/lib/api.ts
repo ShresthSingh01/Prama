@@ -63,3 +63,21 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   }
   return res.json();
 }
+
+export const ROLE_CREDENTIALS: Record<string, { email: string; name: string }> = {
+  maker: { email: "maker@aicte.gov.in", name: "Scrutiny Officer" },
+  checker: { email: "checker@aicte.gov.in", name: "Senior Director" },
+  institute: { email: "institute1@iit.ac.in", name: "NIT Pune (Inst)" },
+  admin: { email: "admin@aicte.gov.in", name: "Bureau Admin" },
+};
+
+export async function switchUserPersona(roleKey: "maker" | "checker" | "institute" | "admin"): Promise<any> {
+  const creds = ROLE_CREDENTIALS[roleKey];
+  if (!creds) return null;
+  const res = await fetchApi<{ access_token: string; user: any }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email: creds.email, password: "Password@123" })
+  });
+  setAuthSession(res.access_token, res.user);
+  return res.user;
+}

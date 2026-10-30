@@ -139,6 +139,19 @@ export default function DashboardPage() {
     const expiring90 = instInstruments.filter(i => i.days_to_maturity >= 0 && i.days_to_maturity <= 90).length;
     const pendingAction = instInstruments.filter(i => (i.flags_count && i.flags_count > 0) || i.days_to_maturity < 0 || i.status === "FLAGGED").length;
 
+    const handleOpenReleaseModal = (item: any) => {
+      setReleaseTarget({
+        id: item.id,
+        fdr_number: item.fdr_number,
+        institution_name: item.institution?.name || currentUser?.name || "College Security Deposit Holder",
+        amount: item.amount,
+        bank_name: item.bank?.name || item.bank_name || "Bank",
+        maturity_date: item.maturity_date,
+        trust_tier: item.trust_tier || "SELF_DECLARED",
+        status: item.status || "ACTIVE"
+      });
+    };
+
     return (
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Welcome Banner */}
@@ -165,13 +178,18 @@ export default function DashboardPage() {
               <FileText className="w-4 h-4" />
               <span>+ Submit New FDR</span>
             </Link>
-            <Link
-              href="/release"
+            <button
+              onClick={() => {
+                if (instInstruments.length > 0) {
+                  const eligible = instInstruments.find(i => i.status === "ACTIVE" || i.status === "MATURED") || instInstruments[0];
+                  handleOpenReleaseModal(eligible);
+                }
+              }}
               className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold rounded-xl text-xs transition border border-slate-200 dark:border-zinc-700 flex items-center gap-1.5"
             >
               <FileCheck2 className="w-4 h-4 text-emerald-500" />
               <span>Apply for Release</span>
-            </Link>
+            </button>
           </div>
         </div>
 
@@ -291,6 +309,13 @@ export default function DashboardPage() {
                           title="Submit renewal"
                         >
                           Renew
+                        </button>
+                        <button
+                          onClick={() => handleOpenReleaseModal(item)}
+                          className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-lg text-xs transition"
+                          title="Apply for statutory release of this deposit"
+                        >
+                          Release
                         </button>
                         <a
                           href={`${API_BASE}/instruments/${item.id}/deficiency-notice`}

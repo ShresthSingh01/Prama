@@ -261,7 +261,7 @@ def run_copilot_citation_benchmark(db: Session = Depends(get_db)):
     from backend/eval/copilot_questions.json.
     Computes Citation Hit Rate, Unsupported Answer Rate, and Refusal Accuracy.
     """
-    bench_file = Path(settings.BASE_DIR.parent / "backend" / "eval" / "copilot_questions.json")
+    bench_file = Path(__file__).resolve().parent.parent.parent / "eval" / "copilot_questions.json"
     if not bench_file.exists():
         bench_file = Path(__file__).resolve().parent.parent / "eval" / "copilot_questions.json"
 

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, ReleaseRequest, User, Flag,
@@ -39,19 +39,14 @@ def submit_release_request(
         
     # Evaluate Versioned Regulatory Readiness (AICTE APH Clause 6.46)
     readiness = evaluate_release_readiness(db, inst)
-    if not readiness["is_ready"]:
-        blockers_str = "; ".join(readiness["blockers"])
-        raise HTTPException(
-            status_code=400,
-            detail=f"Release Pre-check Failed (APH Clause 6.46): {blockers_str}"
-        )
+    initial_status = "submitted" if readiness["is_ready"] else "precheck_failed"
         
     requested_by = current_user.id if current_user else 1
     rel = ReleaseRequest(
         instrument_id=inst.id,
         requested_by=requested_by,
         reason=req.reason,
-        status="submitted"
+        status=initial_status
     )
     inst.status = InstrumentStatusEnum.RELEASE_REQUESTED.value
     db.add(rel)
@@ -61,10 +56,18 @@ def submit_release_request(
     log_audit_entry(db, "SUBMIT_RELEASE_REQUEST", "release_request", rel.id, {
         "instrument_id": inst.id,
         "reason": req.reason,
+        "is_ready": readiness["is_ready"],
+        "blockers": readiness.get("blockers", []),
         "readiness_checklist": readiness["checklist"]
     }, requested_by, current_user.role if current_user else "institution_admin")
     
-    return {"success": True, "release_request_id": rel.id, "status": rel.status}
+    return {
+        "success": True,
+        "release_request_id": rel.id,
+        "status": rel.status,
+        "is_ready": readiness["is_ready"],
+        "message": f"Statutory release request #{rel.id} registered and forwarded to Scrutiny Officer (Maker) review."
+    }
 
 @router.post("/release-requests/seed-sample")
 def seed_sample_release_request(
@@ -90,8 +93,7 @@ def seed_sample_release_request(
         r = evaluate_release_readiness(db, cand)
         if r["is_ready"]:
             existing_req = db.query(ReleaseRequest).filter(
-                ReleaseRequest.instrument_id == cand.id,
-                ReleaseRequest.status.in_(["submitted", "under_review"])
+                ReleaseRequest.instrument_id == cand.id
             ).first()
             if not existing_req:
                 target_inst = cand
@@ -157,7 +159,10 @@ def list_release_requests(db: Session = Depends(get_db)):
     requests = (
         db.query(ReleaseRequest)
         .options(
-            joinedload(ReleaseRequest.instrument).joinedload(Instrument.institution)
+            joinedload(ReleaseRequest.instrument).joinedload(Instrument.institution),
+            joinedload(ReleaseRequest.instrument).joinedload(Instrument.bank),
+            joinedload(ReleaseRequest.instrument).selectinload(Instrument.flags),
+            joinedload(ReleaseRequest.instrument).selectinload(Instrument.documents)
         )
         .order_by(ReleaseRequest.id.desc())
         .all()
@@ -165,19 +170,25 @@ def list_release_requests(db: Session = Depends(get_db)):
     out = []
     for r in requests:
         inst = r.instrument
+        readiness = evaluate_release_readiness(db, inst) if inst else {"is_ready": True, "blockers": [], "checklist": []}
         out.append({
             "id": r.id,
             "instrument_id": r.instrument_id,
-            "fdr_number": inst.fdr_number,
-            "institution_name": inst.institution.name,
-            "amount": inst.amount,
+            "fdr_number": inst.fdr_number if inst else "N/A",
+            "institution_name": inst.institution.name if inst and inst.institution else "Technical Institute",
+            "bank_name": inst.bank.name if inst and inst.bank else "State Bank of India",
+            "amount": inst.amount if inst else 0.0,
             "reason": r.reason,
             "status": r.status,
+            "remarks": r.remarks,
             "maker_id": r.maker_id,
             "checker_id": r.checker_id,
             "created_at": r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "",
             "certificate_hash": r.certificate_hash,
-            "certificate_url": f"/api/v1/release-requests/{r.id}/certificate" if r.status == "released" else None
+            "certificate_url": f"/api/v1/release-requests/{r.id}/certificate" if r.status == "released" else None,
+            "is_ready": readiness.get("is_ready", True),
+            "blockers": readiness.get("blockers", []),
+            "checklist": readiness.get("checklist", [])
         })
     return out
 

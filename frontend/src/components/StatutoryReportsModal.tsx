@@ -6,7 +6,7 @@ import {
   FileSpreadsheet, Download, X, Clock, AlertTriangle, 
   FileText
 } from "lucide-react";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getAuthToken } from "@/lib/api";
 
 interface StatutoryReportsModalProps {
   isOpen: boolean;
@@ -64,6 +64,7 @@ const STATUTORY_REPORTS: ReportItem[] = [
 
 export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryReportsModalProps) {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
@@ -74,14 +75,15 @@ export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryRepo
 
   const handleDownload = async (report: ReportItem) => {
     setDownloadingId(report.id);
+    setDownloadError(null);
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token = getAuthToken();
       const headers: Record<string, string> = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
       const res = await fetch(`${API_BASE}/reports/${report.endpoint}?format=csv`, { headers });
-      if (!res.ok) throw new Error("Failed to download statutory report");
+      if (!res.ok) throw new Error("Failed to download statutory report. Server returned " + res.status);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -91,8 +93,9 @@ export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryRepo
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setDownloadError(e.message || "Failed to download statutory report.");
     } finally {
       setTimeout(() => setDownloadingId(null), 800);
     }
@@ -133,6 +136,13 @@ export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryRepo
             Export official regulatory audit registers generated live from verified institutional database records. 
             All reports conform to AICTE Approval Process Handbook (APH) compliance requirements.
           </p>
+
+          {downloadError && (
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+              <span>{downloadError}</span>
+            </div>
+          )}
 
           <div className="space-y-3">
             {STATUTORY_REPORTS.map((report) => {

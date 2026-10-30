@@ -16,7 +16,7 @@ if (-not (Test-Path $localCloudflared) -and -not (Get-Command cloudflared -Error
     if (-not (Test-Path $binDir)) { New-Item -ItemType Directory -Path $binDir -Force | Out-Null }
     try {
         Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile $localCloudflared -UseBasicParsing
-        Write-Host "[✓] Download complete!" -ForegroundColor Green
+        Write-Host "[+] Download complete!" -ForegroundColor Green
     } catch {
         Write-Host "[!] Could not auto-download cloudflared. Falling back..." -ForegroundColor Yellow
     }
@@ -24,10 +24,10 @@ if (-not (Test-Path $localCloudflared) -and -not (Get-Command cloudflared -Error
 
 if (Test-Path $localCloudflared) {
     Write-Host "[*] Launching Cloudflare Tunnel ($localCloudflared)..." -ForegroundColor Green
-    & $localCloudflared tunnel --url http://localhost:3000
+    & $localCloudflared tunnel --url http://127.0.0.1:3000
 } elseif (Get-Command cloudflared -ErrorAction SilentlyContinue) {
     Write-Host "[*] Launching system Cloudflare Tunnel..." -ForegroundColor Green
-    cloudflared tunnel --url http://localhost:3000
+    cloudflared tunnel --url http://127.0.0.1:3000
 } elseif (Get-Command npx -ErrorAction SilentlyContinue) {
     Write-Host "[*] Starting LocalTunnel via npx fallback..." -ForegroundColor Yellow
     npx localtunnel --port 3000

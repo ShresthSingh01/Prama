@@ -128,3 +128,64 @@ def advance_simulated_clock(db: Session, days: int) -> Dict[str, Any]:
         "reminders_created": reminders_created,
         "escalations_created": escalations_created
     }
+
+def reset_simulated_clock(db: Session) -> Dict[str, Any]:
+    """
+    Resets simulated clock to real-time (offset_days = 0)
+    and recalibrates all active/expiring/matured/overdue instrument statuses
+    strictly according to the real UTC calendar.
+    """
+    clock = get_system_clock(db)
+    clock.offset_days = 0
+    clock.updated_at = utc_now()
+    db.commit()
+
+    now = utc_now()
+    today = now.date()
+
+    instruments = db.query(Instrument).filter(
+        Instrument.status.in_([
+            InstrumentStatusEnum.ACTIVE.value,
+            InstrumentStatusEnum.EXPIRING.value,
+            InstrumentStatusEnum.MATURED.value,
+            InstrumentStatusEnum.OVERDUE.value,
+        ])
+    ).all()
+
+    recalibrated_count = 0
+    for inst in instruments:
+        try:
+            mat_date = datetime.strptime(inst.maturity_date, "%Y-%m-%d").date()
+        except Exception:
+            continue
+
+        days_to_mat = (mat_date - today).days
+        old_status = inst.status
+
+        if days_to_mat < -15:
+            new_status = InstrumentStatusEnum.OVERDUE.value
+        elif days_to_mat <= 0:
+            new_status = InstrumentStatusEnum.MATURED.value
+        elif days_to_mat <= 90:
+            new_status = InstrumentStatusEnum.EXPIRING.value
+        else:
+            new_status = InstrumentStatusEnum.ACTIVE.value
+
+        if old_status != new_status:
+            inst.status = new_status
+            recalibrated_count += 1
+
+    db.commit()
+
+    log_audit_entry(db, "RESET_CLOCK", "system_clock", 1, {
+        "new_offset_days": 0,
+        "simulated_date": today.strftime("%Y-%m-%d"),
+        "recalibrated_instruments": recalibrated_count
+    })
+
+    return {
+        "success": True,
+        "offset_days": 0,
+        "simulated_date": today.strftime("%Y-%m-%d"),
+        "recalibrated_instruments": recalibrated_count
+    }

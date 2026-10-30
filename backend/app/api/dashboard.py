@@ -281,15 +281,7 @@ def list_statutory_reminders(
                 days_to_mat = 0
 
         template_msg = f"Statutory Notice: Fixed Deposit {fdr_num} of Rs {amt:,.2f} matures on {mat_date}."
-        try:
-            hindi_draft = generate_hindi_reminder_draft(
-                template_text=template_msg,
-                fdr_number=fdr_num,
-                amount=amt,
-                maturity_date=mat_date
-            )
-        except Exception:
-            hindi_draft = f"सांविधिक सूचना: सावधि जमा (FDR) {fdr_num} राशि ₹{amt:,.2f} की परिपक्वता तिथि {mat_date} है।"
+        hindi_draft = f"सांविधिक सूचना: सावधि जमा (FDR) #{fdr_num} राशि ₹{amt:,.2f} की परिपक्वता तिथि {mat_date} है। एआईसीएसई विनियम 6.46 के तहत नवीनीकरण या विमुक्ति हेतु अनिवार्य कार्रवाई अपेक्षित है।"
 
         items.append({
             "id": r.id,
@@ -310,4 +302,34 @@ def list_statutory_reminders(
             "hindi_draft": hindi_draft
         })
     return items
+
+@router.post("/reminders/clear")
+def clear_all_reminders(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """Acknowledge and clear all statutory reminder notifications."""
+    query = db.query(Reminder)
+    if current_user and current_user.role == "institution_admin":
+        query = query.join(Instrument).filter(Instrument.institution_id == current_user.institution_id)
+    
+    count = query.count()
+    query.delete(synchronize_session=False)
+    db.commit()
+    return {"success": True, "cleared_count": count, "message": f"Successfully cleared {count} statutory reminder(s)."}
+
+@router.delete("/reminders/{id}")
+def dismiss_single_reminder(
+    id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """Dismiss an individual statutory reminder notification."""
+    rem = db.query(Reminder).filter(Reminder.id == id).first()
+    if not rem:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+        
+    db.delete(rem)
+    db.commit()
+    return {"success": True, "id": id, "message": "Statutory reminder dismissed."}
 

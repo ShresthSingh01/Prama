@@ -63,7 +63,8 @@ def build_syndicate_graph(db: Session) -> Dict[str, Any]:
                 "type": "fdr",
                 "amount": inst.amount,
                 "status": inst.status,
-                "size": 14
+                "size": 14,
+                "instrument_id": inst.id
             })
             node_set.add(fdr_node_id)
             

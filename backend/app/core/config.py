@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Prama"
     VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
+    BASE_DIR: Path = BASE_DIR
     
     # Database: SQLite with WAL mode by default; easily switches to postgresql://...
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/fdr_sentinel.db")
