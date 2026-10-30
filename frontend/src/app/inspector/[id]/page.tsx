@@ -314,8 +314,8 @@ export default function DepositInspectorPage() {
 
     try {
       const endpoint = tampered 
-        ? `/mock-bank/issue-tampered-sample-fdr?bank_id=${detail.bank_id}&fdr_number=${detail.fdr_number}&amount=${detail.amount}&maturity_date=${detail.maturity_date}&holder_name=${encodeURIComponent(detail.institution_name)}`
-        : `/mock-bank/issue-sample-fdr?bank_id=${detail.bank_id}&fdr_number=${detail.fdr_number}&amount=${detail.amount}&maturity_date=${detail.maturity_date}&holder_name=${encodeURIComponent(detail.institution_name)}`;
+        ? `/mock-bank/issue-tampered-sample-fdr?bank_id=${detail.bank_id}&fdr_number=${detail.fdr_number}&amount=${detail.amount}&issue_date=${detail.issue_date}&maturity_date=${detail.maturity_date}&holder_name=${encodeURIComponent(detail.institution_name)}`
+        : `/mock-bank/issue-sample-fdr?bank_id=${detail.bank_id}&fdr_number=${detail.fdr_number}&amount=${detail.amount}&issue_date=${detail.issue_date}&maturity_date=${detail.maturity_date}&holder_name=${encodeURIComponent(detail.institution_name)}`;
 
       const qrIssue = await fetchApi<any>(endpoint, { method: "POST" });
       const envelopeStr = tampered ? qrIssue.tampered_envelope_json : qrIssue.envelope_json;
