@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Clock, RotateCcw, 
   BarChart3, ListFilter, Network, FileCheck2, FileText, Activity,
-  Lock, CheckCircle2, XCircle, BookOpen, Sparkles, Sun, Moon,
-  HelpCircle, ChevronDown, Bell, X
+  Lock, CheckCircle2, BookOpen, Sparkles, Sun, Moon,
+  ChevronDown, Bell, X
 } from "lucide-react";
 import { fetchApi, setAuthSession, getCurrentUser, getAuthToken } from "@/lib/api";
 import { useTheme } from "./ThemeProvider";
@@ -30,16 +31,18 @@ export default function Navigation() {
     offset_days: 0,
     simulated_date: "2026-10-26"
   });
-  const [auditValid, setAuditValid] = useState<boolean>(true);
+  const [_auditValid, setAuditValid] = useState<boolean>(true);
   const [advancing, setAdvancing] = useState<boolean>(false);
   const [activeRole, setActiveRole] = useState<string>("maker");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [mounted, setMounted] = useState<boolean>(false);
   const [copilotOpen, setCopilotOpen] = useState<boolean>(false);
   const [copilotQuestion, setCopilotQuestion] = useState<string>("");
   const [walkthroughOpen, setWalkthroughOpen] = useState<boolean>(false);
   const [reminders, setReminders] = useState<any[]>([]);
   const [remindersOpen, setRemindersOpen] = useState<boolean>(false);
   const [expandedHindiId, setExpandedHindiId] = useState<number | null>(null);
+  const [moreToolsOpen, setMoreToolsOpen] = useState<boolean>(false);
 
   const refreshReminders = async () => {
     try {
@@ -70,9 +73,7 @@ export default function Navigation() {
     try {
       const data = await fetchApi<{ offset_days: number; simulated_date: string }>("/demo/status");
       setClockData(data);
-    } catch {
-      // Backend starting or silent
-    }
+    } catch {}
   };
 
   const refreshAudit = async () => {
@@ -83,6 +84,7 @@ export default function Navigation() {
   };
 
   useEffect(() => {
+    setMounted(true);
     const user = getCurrentUser();
     if (!user || !getAuthToken()) {
       loginAsRole("maker");
@@ -96,15 +98,18 @@ export default function Navigation() {
     refreshClock();
     refreshAudit();
     refreshReminders();
+
     const interval = setInterval(() => {
       refreshClock();
       refreshReminders();
     }, 10000);
+
     const handleUpdate = () => {
       refreshClock();
       refreshAudit();
       refreshReminders();
     };
+
     const handleOpenCopilot = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.question) {
@@ -112,9 +117,11 @@ export default function Navigation() {
       }
       setCopilotOpen(true);
     };
+
     window.addEventListener("clockUpdated", handleUpdate);
     window.addEventListener("auditUpdated", handleUpdate);
     window.addEventListener("openCopilot", handleOpenCopilot);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener("clockUpdated", handleUpdate);
@@ -152,191 +159,48 @@ export default function Navigation() {
     }
   };
 
-  // Primary PS 26265 Navigation Items (Role-Aware)
   const isInstitutionRole = currentUser?.role === "institution_admin" || activeRole === "institute";
 
-  interface NavItem {
-    label: string;
-    href: string;
-    icon: any;
-    desc: string;
-    badge?: string;
-  }
-
-  const officerNavItems: NavItem[] = [
-    { label: "Dashboard", href: "/", icon: BarChart3, desc: "Overview & regulatory metrics" },
-    { label: "Pending Actions", href: "/queue", icon: ListFilter, desc: "FDRs needing regulatory review" },
-    { label: "Duplicate & Fraud Detection", href: "/graph", icon: Network, desc: "Visual fraud detection map (Collusion Rings)", badge: "5 Rings" },
-    { label: "Submit FDR / Security Deposit", href: "/submit", icon: FileText, desc: "Register certificate" },
-    { label: "Deposit Release & Refund", href: "/release", icon: FileCheck2, desc: "Dual-officer approval" },
-    { label: "Activity & Audit Log", href: "/audit", icon: Lock, desc: "Tamper-proof logs" },
-  ];
-
-  const institutionNavItems: NavItem[] = [
-    { label: "My Deposits", href: "/", icon: BarChart3, desc: "College security deposits overview" },
-    { label: "Submit FDR / Security Deposit", href: "/submit", icon: FileText, desc: "Submit new or renewed FDR" },
-    { label: "Deposit Release & Refund", href: "/release", icon: FileCheck2, desc: "Request deposit release" },
-    { label: "AICTE Regulations", href: "/knowledge", icon: BookOpen, desc: "Approval Process Guidelines" },
-  ];
-
-  const primaryNavItems = isInstitutionRole ? institutionNavItems : officerNavItems;
-
-  const toolsNavItems = [
-    { label: "AICTE Regulations & Handbooks", href: "/knowledge", icon: BookOpen, desc: "AICTE regulations" },
-    { label: "System Benchmarks", href: "/evaluation", icon: Activity, desc: "Accuracy benchmarks" },
-  ];
-
-  const [toolsOpen, setToolsOpen] = useState(false);
-
+  // Hide entire navbar on standalone external bank verification page
   if (pathname?.startsWith("/bank-verify")) {
     return null;
   }
 
+  // 4 Primary ATM Nav Items
+  const primaryNavItems = [
+    { label: isInstitutionRole ? "My Deposits" : "Dashboard", href: "/", icon: BarChart3 },
+    { label: "Actions Queue", href: "/queue", icon: ListFilter, hidden: isInstitutionRole },
+    { label: "Submit FDR", href: "/submit", icon: FileText },
+    { label: "Release & Refund", href: "/release", icon: FileCheck2 },
+  ].filter(item => !item.hidden);
+
+  const moreTools = [
+    { label: "Duplicate & Fraud Map", href: "/graph", icon: Network, desc: "Syndicate collusion analysis" },
+    { label: "Cryptographic Audit Ledger", href: "/audit", icon: Lock, desc: "SHA-256 Merkle chain logs" },
+    { label: "AICTE Regulations", href: "/knowledge", icon: BookOpen, desc: "Approval Process Guidelines" },
+    { label: "System Benchmarks", href: "/evaluation", icon: Activity, desc: "Forensic accuracy metrics" }
+  ];
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur border-b border-slate-200 dark:border-zinc-800 text-slate-800 dark:text-zinc-100 transition-colors duration-200">
-      {/* Top Regulatory Intelligence Bar */}
-      <div className="px-4 py-1.5 bg-slate-100/90 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-1.5 font-semibold tracking-wide text-slate-800 dark:text-zinc-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            AICTE REGULATION BUREAU <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">PS 26265</span>
-            <span className="text-slate-400 dark:text-zinc-500 font-normal">| Prama</span>
-          </div>
-          
-          {/* Simulated Time Machine Controls */}
-          <div className="flex items-center gap-2 bg-white dark:bg-zinc-950 px-2.5 py-0.5 rounded-md border border-slate-200 dark:border-zinc-700 shadow-sm" title="Maturity Time Machine — Simulate future dates to trigger expiry alerts">
-            <Clock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-            <span className="text-amber-600 dark:text-amber-400 font-semibold text-[10px] uppercase tracking-wide hidden md:inline">Time Machine</span>
-            <span className="text-slate-500 dark:text-zinc-400 hidden md:inline">·</span>
-            <span className="text-slate-500 dark:text-zinc-400">Date:</span>
-            <span className="font-mono font-medium text-amber-600 dark:text-amber-300">{clockData.simulated_date}</span>
-            {clockData.offset_days > 0 && (
-              <span className="text-[10px] bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1 rounded font-semibold">
-                +{clockData.offset_days}d
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+        {/* Left: Brand Identity */}
+        <div className="flex items-center gap-3 shrink-0">
+          <Link href="/" className="flex items-center gap-2 group">
+            <PramaLogo size="sm" variant="icon" />
+            <div className="flex flex-col">
+              <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white leading-none group-hover:text-amber-500 transition-colors">
+                PRAMA
               </span>
-            )}
-            
-            <div className="h-3 w-px bg-slate-200 dark:bg-zinc-700 mx-0.5"></div>
-            
-            <div className="flex items-center gap-1">
-              <button 
-                onClick={() => handleAdvance(30)}
-                disabled={advancing}
-                className="px-1.5 py-0.5 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded text-[11px] font-mono transition"
-                title="Advance clock 30 days to test near-maturity alerts"
-              >
-                +30d
-              </button>
-              <button 
-                onClick={() => handleAdvance(60)}
-                disabled={advancing}
-                className="px-1.5 py-0.5 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 rounded text-[11px] font-mono transition"
-                title="Advance clock 60 days"
-              >
-                +60d
-              </button>
-              <button 
-                onClick={() => handleAdvance(90)}
-                disabled={advancing}
-                className="px-1.5 py-0.5 bg-amber-500/10 dark:bg-amber-600/30 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded text-[11px] font-mono transition font-medium"
-                title="Advance clock 90 days to test overdue policies"
-              >
-                +90d
-              </button>
-              {clockData.offset_days > 0 && (
-                <button 
-                  onClick={handleReset}
-                  disabled={advancing}
-                  className="px-1.5 py-0.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded transition"
-                  title="Reset clock to today"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                </button>
-              )}
+              <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-semibold uppercase tracking-wider mt-0.5">
+                AICTE FDR Portal
+              </span>
             </div>
-
-            {/* Automated Alerts Bell (PS 26265 Item 4 & 7) */}
-            <div className="h-3 w-px bg-slate-200 dark:bg-zinc-700 mx-0.5"></div>
-            <button
-              onClick={() => setRemindersOpen(true)}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-[11px] font-semibold transition"
-              title="Statutory Alerts & Escalation Ladder"
-            >
-              <Bell className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden sm:inline">Alerts</span>
-              {reminders.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white font-mono text-[10px] font-bold">
-                  {reminders.length}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Right Status Items & Controls */}
-        <div className="flex items-center gap-3">
-          {/* Security Status Badge */}
-          <Link 
-            href="/audit" 
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 shadow-sm transition hover:border-slate-300 dark:hover:border-zinc-600"
-            title="Click to view tamper-evident audit history"
-          >
-            {auditValid ? (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="text-emerald-700 dark:text-emerald-400 font-medium text-[11px]">Audit Integrity: Verified</span>
-              </>
-            ) : (
-              <>
-                <XCircle className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-                <span className="text-rose-600 dark:text-rose-400 font-bold font-mono text-[11px]">Audit Break Detected!</span>
-              </>
-            )}
-          </Link>
-
-          {/* User Persona Switcher */}
-          <div className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400">
-            <span className="text-[11px] hidden sm:inline">Active Persona:</span>
-            <select 
-              value={activeRole} 
-              onChange={(e) => loginAsRole(e.target.value)}
-              className="bg-white dark:bg-zinc-950 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 rounded px-2 py-0.5 text-xs focus:outline-none shadow-sm font-medium"
-            >
-              <option value="maker">Scrutiny Officer (Maker)</option>
-              <option value="checker">Senior Director (Checker)</option>
-              <option value="institute">Institution Admin (NIT Pune)</option>
-              <option value="admin">System Administrator</option>
-            </select>
-            {currentUser?.name && (
-              <span className="hidden md:inline-block px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[10px] font-semibold border border-amber-500/20">
-                {currentUser.name}
-              </span>
-            )}
-          </div>
-
-          {/* Light / Dark Mode Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            className="p-1.5 rounded-md bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:text-amber-500 dark:hover:text-amber-400 transition shadow-sm"
-            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            aria-label="Toggle Theme"
-          >
-            {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-700" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Primary Navigation Row */}
-      <nav className="px-4 md:px-6 py-2 flex items-center justify-between gap-3 border-b border-slate-200/60 dark:border-zinc-800/60">
-        {/* Left: Brand Logo */}
-        <div className="flex items-center shrink-0">
-          <Link href="/" className="flex items-center shrink-0">
-            <PramaLogo size="sm" variant="full" />
           </Link>
         </div>
 
-        {/* Center: Clean Primary Navigation Links + Tools Dropdown */}
-        <div className="flex-1 min-w-0 overflow-x-auto no-scrollbar scroll-smooth flex items-center gap-1.5 px-2">
+        {/* Center: ATM Primary Navigation Touchpoints */}
+        <nav className="hidden md:flex items-center gap-1.5">
           {primaryNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -345,97 +209,152 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition ${
-                  isActive 
-                    ? "bg-amber-500/15 text-amber-800 dark:bg-zinc-800 dark:text-white border border-amber-500/30 dark:border-zinc-700 shadow-sm" 
-                    : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900"
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                  isActive
+                    ? "bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/20"
+                    : "text-slate-600 dark:text-zinc-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-900"
                 }`}
-                title={item.desc}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <Icon className="w-4 h-4 shrink-0" />
                 <span>{item.label}</span>
-                {item.badge && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                    {item.badge}
-                  </span>
-                )}
               </Link>
             );
           })}
 
-          {/* Tools & Analytics Dropdown (Officers only) */}
+          {/* More Tools Dropdown */}
           {!isInstitutionRole && (
-            <div className="relative shrink-0">
+            <div className="relative">
               <button
-                onClick={() => setToolsOpen(!toolsOpen)}
-                onBlur={() => setTimeout(() => setToolsOpen(false), 200)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                  toolsNavItems.some(t => pathname.startsWith(t.href))
-                    ? "bg-amber-500/15 text-amber-800 dark:bg-zinc-800 dark:text-white border border-amber-500/30 dark:border-zinc-700 shadow-sm"
+                onClick={() => setMoreToolsOpen(!moreToolsOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                  moreTools.some(t => pathname.startsWith(t.href))
+                    ? "bg-slate-200 dark:bg-zinc-800 text-slate-900 dark:text-white"
                     : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900"
                 }`}
               >
-                <span>More Tools</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${toolsOpen ? "rotate-180" : ""}`} />
+                <span>Tools</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${moreToolsOpen ? "rotate-180" : ""}`} />
               </button>
-              {toolsOpen && (
-                <div className="absolute left-0 top-full mt-1.5 w-52 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl py-1 z-50 animate-in fade-in zoom-in-95">
-                  {toolsNavItems.map((tool) => {
-                    const ToolIcon = tool.icon;
-                    const isToolActive = pathname.startsWith(tool.href);
-                    if (pathname?.startsWith("/bank-verify")) {
-    return null;
-  }
 
-  return (
-                      <Link
-                        key={tool.href}
-                        href={tool.href}
-                        onClick={() => setToolsOpen(false)}
-                        className={`flex items-center gap-2 px-3 py-2 text-xs font-medium transition ${
-                          isToolActive
-                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 font-semibold"
-                            : "text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800"
-                        }`}
-                      >
-                        <ToolIcon className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
-                        <div>
-                          <div>{tool.label}</div>
-                          <div className="text-[10px] text-slate-400 dark:text-zinc-500">{tool.desc}</div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
+              {moreToolsOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setMoreToolsOpen(false)}></div>
+                  <div className="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95">
+                    {moreTools.map((tool) => {
+                      const ToolIcon = tool.icon;
+                      const isToolActive = pathname.startsWith(tool.href);
+                      return (
+                        <Link
+                          key={tool.href}
+                          href={tool.href}
+                          onClick={() => setMoreToolsOpen(false)}
+                          className={`flex items-start gap-2.5 p-2.5 rounded-xl text-xs transition ${
+                            isToolActive
+                              ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold"
+                              : "text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                          }`}
+                        >
+                          <ToolIcon className="w-4 h-4 mt-0.5 text-slate-500 dark:text-zinc-400 shrink-0" />
+                          <div>
+                            <div className="font-semibold">{tool.label}</div>
+                            <div className="text-[11px] text-slate-400 dark:text-zinc-500">{tool.desc}</div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
-        </div>
+        </nav>
 
-        {/* Right Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0 pl-2">
-          {/* Quick Walkthrough Button */}
+        {/* Right: Essential ATM Controls */}
+        <div className="flex items-center gap-2">
+          {/* Compact Simulated Date Pill */}
+          <div className="hidden lg:flex items-center gap-1.5 bg-slate-100 dark:bg-zinc-900 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-zinc-800 text-xs">
+            <Clock className="w-3.5 h-3.5 text-amber-500" />
+            <span className="font-mono font-bold text-slate-800 dark:text-zinc-200 text-[11px]">
+              {clockData.simulated_date}
+            </span>
+            {clockData.offset_days > 0 && (
+              <span className="text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 px-1 rounded font-bold">
+                +{clockData.offset_days}d
+              </span>
+            )}
+            <button
+              onClick={() => handleAdvance(30)}
+              disabled={advancing}
+              className="ml-1 px-1.5 py-0.5 rounded bg-white dark:bg-zinc-800 hover:bg-slate-200 text-[10px] font-mono font-bold text-slate-700 dark:text-zinc-300 transition"
+              title="Fast-forward clock 30 days to test near-maturity alerts"
+            >
+              +30d
+            </button>
+            {clockData.offset_days > 0 && (
+              <button
+                onClick={handleReset}
+                disabled={advancing}
+                className="p-1 rounded text-slate-400 hover:text-rose-500 transition"
+                title="Reset date to today"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Alerts Bell */}
           <button
-            onClick={() => setWalkthroughOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-zinc-700 transition shadow-sm whitespace-nowrap"
-            title="How Prama Works"
+            onClick={() => setRemindersOpen(true)}
+            className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 transition"
+            title="Statutory Alerts & Notices"
+            aria-label="Statutory Alerts"
           >
-            <HelpCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-            <span className="hidden sm:inline">How It Works</span>
+            <Bell className="w-4 h-4" />
+            {reminders.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-600 text-white font-mono text-[9px] font-bold flex items-center justify-center animate-pulse">
+                {reminders.length}
+              </span>
+            )}
           </button>
 
-          {/* Compliance Copilot Button */}
+          {/* Active Persona Dropdown */}
+          <div className="relative">
+            <select
+              value={activeRole}
+              onChange={(e) => loginAsRole(e.target.value)}
+              className="bg-slate-100 dark:bg-zinc-900 text-slate-900 dark:text-white border border-slate-200 dark:border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-sm"
+              title="Select Active User Persona"
+            >
+              <option value="maker">Scrutiny Officer (Maker)</option>
+              <option value="checker">Senior Director (Checker)</option>
+              <option value="institute">NIT Pune (College)</option>
+              <option value="admin">Bureau Administrator</option>
+            </select>
+          </div>
+
+          {/* AI Copilot Button */}
           <button
             onClick={() => setCopilotOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-lg text-xs shadow-md shadow-amber-500/10 transition whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl text-xs transition shadow-sm"
+            title="Open AI Compliance Copilot"
           >
-            <Sparkles className="w-3.5 h-3.5 fill-current shrink-0" />
-            <span>AI Copilot</span>
+            <Sparkles className="w-3.5 h-3.5 fill-current" />
+            <span className="hidden sm:inline">AI Copilot</span>
+          </button>
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 transition"
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label="Toggle Theme"
+          >
+            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
           </button>
         </div>
-      </nav>
+      </div>
 
-      {/* Global Copilot Sidecar Drawer */}
+      {/* Global AI Copilot Drawer */}
       <CopilotPanel
         isOpen={copilotOpen}
         initialQuestion={copilotQuestion}
@@ -445,103 +364,160 @@ export default function Navigation() {
         }}
       />
 
-      {/* Interactive Walkthrough Modal */}
+      {/* Walkthrough Tour Modal */}
       <WalkthroughModal
         isOpen={walkthroughOpen}
         onClose={() => setWalkthroughOpen(false)}
       />
 
-      {/* Statutory Alerts & Escalation Ladder Drawer (PS 26265 Item 4 & 7) */}
-      {remindersOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex justify-end">
-          <div className="bg-white dark:bg-zinc-900 border-l border-slate-200 dark:border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
-            {/* Drawer Header */}
-            <div className="p-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50 dark:bg-zinc-950">
+      {/* Automated Statutory Alerts Modal (Portaled to document.body for flawless viewport centering) */}
+      {mounted && remindersOpen && createPortal(
+        <div 
+          className="fixed inset-0 z-[100] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+          onClick={() => setRemindersOpen(false)}
+        >
+          <div 
+            className="relative bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl max-h-[85vh] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:px-5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50 dark:bg-zinc-950 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
                   <Bell className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Statutory Alerts & Escalation Center
-                  </h2>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                    Statutory Expiry & Renewal Alerts
+                  </h3>
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                    AICTE PS 26265 Item 4 & 7 • Automated Reminders Ladder
+                    {reminders.length} active automated compliance notice{reminders.length === 1 ? "" : "s"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setRemindersOpen(false)}
-                className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+                aria-label="Close alerts modal"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Reminders List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {/* Modal List Items */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1">
               {reminders.length === 0 ? (
-                <div className="text-center py-16 text-slate-400 text-xs">
-                  <Clock className="w-10 h-10 mx-auto mb-3 opacity-40 text-amber-500" />
-                  <p className="font-semibold text-slate-700 dark:text-zinc-300">No Active Escalation Notices</p>
-                  <p className="mt-1 text-slate-500 dark:text-zinc-400 max-w-xs mx-auto">
-                    Use the simulated Time Machine (+30d, +60d, +90d) in the top bar to trigger upcoming maturity notices and overdue escalations.
+                <div className="text-center py-10 text-xs text-slate-500 dark:text-zinc-400 space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <p className="font-semibold text-slate-800 dark:text-zinc-200">No Pending Statutory Alerts</p>
+                  <p className="text-[11px] max-w-xs mx-auto">
+                    All institutional fixed deposit instruments comply with AICTE maturity rules.
                   </p>
                 </div>
               ) : (
-                reminders.map((r) => (
-                  <div
-                    key={r.id}
-                    className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950/60 shadow-sm space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                        {r.rule_name}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {r.channel} • {r.sent_at}
-                      </span>
-                    </div>
+                reminders.map((rem: any, idx: number) => {
+                  let daysLeft = rem.days_to_maturity;
+                  if ((daysLeft === undefined || daysLeft === null) && rem.maturity_date && clockData?.simulated_date) {
+                    try {
+                      const mat = new Date(rem.maturity_date).getTime();
+                      const now = new Date(clockData.simulated_date).getTime();
+                      daysLeft = Math.ceil((mat - now) / (1000 * 60 * 60 * 24));
+                    } catch {}
+                  }
 
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">
-                        {r.institution_name}
-                      </div>
-                      <div className="text-[11px] font-mono text-slate-500 dark:text-zinc-400 mt-0.5">
-                        FDR #{r.fdr_number} • ₹{r.amount_lakhs} Lakhs • Matures {r.maturity_date}
-                      </div>
-                    </div>
+                  const isOverdue = typeof daysLeft === "number" && daysLeft <= 0;
+                  const badgeText = typeof daysLeft === "number"
+                    ? (isOverdue ? "OVERDUE" : `${daysLeft}d left`)
+                    : "NOTICE";
 
-                    {/* Bilingual Notice Toggle */}
-                    <div className="pt-1 border-t border-slate-100 dark:border-zinc-800/80">
-                      <button
-                        onClick={() => setExpandedHindiId(expandedHindiId === r.id ? null : r.id)}
-                        className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                      >
-                        {expandedHindiId === r.id ? "Hide Bilingual Notice" : "View Hindi / English Notice Draft"}
-                      </button>
-                      {expandedHindiId === r.id && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-[11px] space-y-1.5 font-sans">
-                          <div className="text-slate-800 dark:text-zinc-200 font-medium leading-relaxed">
-                            {r.hindi_draft}
+                  const noticeText = rem.reminder_text || `Statutory Notice: Fixed Deposit ${rem.fdr_number} of ₹${rem.amount_lakhs || (rem.amount ? (rem.amount / 100000).toFixed(2) : 0)} Lakhs matures on ${rem.maturity_date}.`;
+                  const hindiText = rem.hindi_reminder_text || rem.hindi_draft;
+
+                  return (
+                    <div
+                      key={rem.id || idx}
+                      className="p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-950/60 hover:border-slate-300 dark:hover:border-zinc-700 transition space-y-2"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                              FDR: {rem.fdr_number}
+                            </span>
+                            {rem.channel && (
+                              <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400">
+                                {rem.channel}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-[10px] text-slate-400 border-t border-slate-200 dark:border-zinc-800 pt-1">
-                            Dispatched via {r.channel} to Institution Principal & Regional Officer.
+                          <div className="text-[11px] text-slate-600 dark:text-zinc-400 mt-0.5">
+                            {rem.institution_name} • Matures <span className="font-mono font-semibold">{rem.maturity_date}</span>
                           </div>
+                        </div>
+
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wide shrink-0 ${
+                          isOverdue
+                            ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                            : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                        }`}>
+                          {badgeText}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+                        {noticeText}
+                      </p>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-zinc-800/80 text-[11px]">
+                        {hindiText ? (
+                          <button
+                            onClick={() => setExpandedHindiId(expandedHindiId === idx ? null : idx)}
+                            className="font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
+                          >
+                            <span>{expandedHindiId === idx ? "Hide Hindi Notice" : "सांविधिक हिंदी सूचना (Hindi Notice)"}</span>
+                          </button>
+                        ) : <span />}
+
+                        {rem.instrument_id && (
+                          <Link
+                            href={`/inspector/${rem.instrument_id}`}
+                            onClick={() => setRemindersOpen(false)}
+                            className="font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>Inspect Instrument</span>
+                            <span>&rarr;</span>
+                          </Link>
+                        )}
+                      </div>
+
+                      {expandedHindiId === idx && hindiText && (
+                        <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-950 dark:text-amber-200 text-xs font-serif leading-relaxed border border-amber-500/20">
+                          {hindiText}
                         </div>
                       )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
-            {/* Footer */}
-            <div className="p-3 border-t border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 text-center text-[10px] text-slate-500 font-mono">
-              AICTE Escalation Ladder: T-90 (Email) ➔ T-60 (Email) ➔ T-30 (SMS+Email) ➔ Overdue +1 (Scrutiny Alert)
+            {/* Modal Footer */}
+            <div className="p-3.5 sm:px-5 border-t border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
+                AICTE APH Clause 6.46
+              </span>
+              <button
+                onClick={() => setRemindersOpen(false)}
+                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-800 dark:hover:bg-zinc-700 font-bold rounded-xl text-xs transition shadow-sm"
+              >
+                Close
+              </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );

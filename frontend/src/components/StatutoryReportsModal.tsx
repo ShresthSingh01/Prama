@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   FileSpreadsheet, Download, X, Clock, AlertTriangle, 
   FileText
@@ -63,8 +64,13 @@ const STATUTORY_REPORTS: ReportItem[] = [
 
 export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryReportsModalProps) {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState<boolean>(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !isOpen) return null;
 
   const handleDownload = async (report: ReportItem) => {
     setDownloadingId(report.id);
@@ -92,7 +98,7 @@ export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryRepo
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
@@ -178,7 +184,8 @@ export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryRepo
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

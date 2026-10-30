@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   RotateCw, X, AlertTriangle
 } from "lucide-react";
@@ -37,6 +38,11 @@ export default function RenewalModal({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (parentInstrument) {
@@ -54,7 +60,7 @@ export default function RenewalModal({
     }
   }, [parentInstrument]);
 
-  if (!isOpen || !parentInstrument) return null;
+  if (!mounted || !isOpen || !parentInstrument) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +116,7 @@ export default function RenewalModal({
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
@@ -284,7 +290,8 @@ export default function RenewalModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -251,6 +251,9 @@ def list_statutory_reminders(
     """Returns fired automated reminder and escalation notices (PS 26265 Items 4 & 7)."""
     from backend.app.services.slm_tasks import generate_hindi_reminder_draft
 
+    simulated_now = get_simulated_now(db)
+    sim_date = simulated_now.date()
+
     query = db.query(Reminder).options(
         joinedload(Reminder.instrument).joinedload(Instrument.institution),
         joinedload(Reminder.rule)
@@ -269,6 +272,14 @@ def list_statutory_reminders(
         mat_date = inst.maturity_date if inst else "N/A"
         rule_name = r.rule.name if r.rule else f"Level {r.level} Statutory Notice"
         
+        days_to_mat = 0
+        if inst and inst.maturity_date:
+            try:
+                mat = datetime.strptime(inst.maturity_date, "%Y-%m-%d").date()
+                days_to_mat = (mat - sim_date).days
+            except Exception:
+                days_to_mat = 0
+
         template_msg = f"Statutory Notice: Fixed Deposit {fdr_num} of Rs {amt:,.2f} matures on {mat_date}."
         try:
             hindi_draft = generate_hindi_reminder_draft(
@@ -288,7 +299,10 @@ def list_statutory_reminders(
             "amount": amt,
             "amount_lakhs": round(amt / 100000.0, 2),
             "maturity_date": mat_date,
+            "days_to_maturity": days_to_mat,
             "rule_name": rule_name,
+            "reminder_text": template_msg,
+            "hindi_reminder_text": hindi_draft,
             "level": r.level,
             "channel": r.channel,
             "status": r.status,

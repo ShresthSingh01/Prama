@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   FileCheck2, X, CheckCircle2, AlertTriangle, Ban
 } from "lucide-react";
@@ -33,6 +34,11 @@ export default function ReleaseApplicationModal({
   const [reason, setReason] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (instrument && isOpen) {
@@ -57,7 +63,7 @@ export default function ReleaseApplicationModal({
     }
   };
 
-  if (!isOpen || !instrument) return null;
+  if (!mounted || !isOpen || !instrument) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +90,7 @@ export default function ReleaseApplicationModal({
 
   const isReady = readiness?.is_ready;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
@@ -222,7 +228,8 @@ export default function ReleaseApplicationModal({
           AICTE Release Workflow: Institution Application ➔ Scrutiny Officer Verification ➔ Senior Director Sign-Off
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
