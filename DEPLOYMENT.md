@@ -33,6 +33,37 @@ docker compose up --build -d
 
 ---
 
+## 1.5 Instant Public HTTPS Tunnels (For Live Demos & External Access)
+
+Prama's Next.js architecture automatically reverse-proxies `/api/v1/*` and `/storage/*` to the backend. **You only need to expose port 3000 to get the entire full-stack platform live over HTTPS with zero CORS or Mixed Content errors!**
+
+### Launching with the Included 1-Click Script:
+- **Windows:** Double-click `tunnel.bat` or run `.\tunnel.ps1`
+- **Linux / macOS:** Run `./tunnel.sh`
+
+### Or Choose Your Preferred Tunnel Tool:
+1. **Cloudflare Quick Tunnel (Free, No Account, Globally Fast):**
+   ```bash
+   cloudflared tunnel --url http://localhost:3000
+   ```
+2. **Pinggy SSH Tunnel (Zero Installation, Works on Any OS with SSH):**
+   ```bash
+   ssh -p 443 -R0:localhost:3000 a.pinggy.io
+   ```
+3. **LocalTunnel (Node.js npx):**
+   ```bash
+   npx localtunnel --port 3000
+   ```
+4. **Built-in Docker Tunnel:**
+   ```bash
+   docker compose --profile tunnel up -d
+   docker compose logs -f tunnel
+   ```
+
+Share the generated `https://...` link with SIH judges, external bank officers, or remote team members!
+
+---
+
 ## 2. Production Service URLs & Access Points
 
 | Service | Port | Production URL | Description |

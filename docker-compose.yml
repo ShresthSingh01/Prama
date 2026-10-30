@@ -42,6 +42,19 @@ services:
     networks:
       - prama-network
 
+  # Optional Cloudflare Quick Tunnel (Run with: docker compose --profile tunnel up -d)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: prama-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://frontend:3000
+    depends_on:
+      - frontend
+    networks:
+      - prama-network
+    profiles:
+      - tunnel
+
 volumes:
   prama_storage:
   prama_data:

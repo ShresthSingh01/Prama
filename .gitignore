@@ -37,6 +37,8 @@ coverage/
 *.log
 .eslintcache
 .cache/
+bin/*.exe
+bin/cloudflared
 
 # Agents & Local IDE Metadata
 .agent/

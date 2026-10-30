@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+export const API_BASE = 
+  process.env.NEXT_PUBLIC_API_URL || 
+  (typeof window !== "undefined" ? "/api/v1" : (process.env.BACKEND_INTERNAL_URL ? `${process.env.BACKEND_INTERNAL_URL}/api/v1` : "http://127.0.0.1:8000/api/v1"));
 
 const TOKEN_KEY = "prama_auth_token";
 const USER_KEY = "prama_auth_user";
@@ -61,5 +63,3 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   }
   return res.json();
 }
-
-export { API_BASE };

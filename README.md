@@ -220,7 +220,17 @@ This script automatically:
 
 ---
 
-### Option 3: Manual Startup
+### Option 4: Instant Public HTTPS Tunnel (Remote Demos & Mobile Testing)
+To share Prama instantly with remote judges or test on mobile devices without any account, port-forwarding, or cloud setup:
+```powershell
+.\tunnel.ps1   # Or double-click tunnel.bat (Windows)
+./tunnel.sh    # On Linux / macOS
+```
+- Uses the bundled standalone `bin/cloudflared.exe` (zero installation or admin privileges needed).
+- Generates an instant, secure public HTTPS link (`https://*.trycloudflare.com`).
+- Because Next.js reverse-proxies `/api/v1/*` and `/storage/*`, **both UI and API work seamlessly with zero CORS errors and zero mixed-content blocks.**
+
+---
 
 #### 1. Backend Service
 ```powershell
