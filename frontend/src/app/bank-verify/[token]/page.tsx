@@ -6,8 +6,7 @@ import {
   Building2, CheckCircle2, XCircle, AlertTriangle, ShieldCheck, 
   Landmark, ArrowRight, FileCheck, Lock, Clock, Calendar, ExternalLink
 } from "lucide-react";
-
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+import { API_BASE } from "@/lib/api";
 
 interface BankVerifyData {
   institution_name: string;

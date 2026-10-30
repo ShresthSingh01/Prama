@@ -5,13 +5,12 @@ import {
   FileSpreadsheet, Download, X, CheckCircle2, Clock, AlertTriangle, 
   FileText, ShieldCheck, ChevronRight
 } from "lucide-react";
+import { API_BASE } from "@/lib/api";
 
 interface StatutoryReportsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const API_BASE = "http://127.0.0.1:8000/api/v1";
 
 interface ReportItem {
   id: string;

@@ -94,10 +94,8 @@ export default function RenewalModal({
         const formData = new FormData();
         formData.append("file", file);
         formData.append("kind", "fdr_receipt");
-        const token = localStorage.getItem("token") || "";
-        await fetch(`http://127.0.0.1:8000/api/v1/instruments/${res.renewed_instrument_id}/documents`, {
+        await fetchApi(`/instruments/${res.renewed_instrument_id}/documents`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
           body: formData
         }).catch(() => {});
       }
