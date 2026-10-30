@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -14,10 +15,28 @@ from backend.app.api import (
 # Auto-create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from backend.app.models.database import SessionLocal
+    from backend.app.models.entities import User
+    db = SessionLocal()
+    try:
+        if db.query(User).count() == 0:
+            print("[*] Database is empty. Running initial statutory seed for AICTE FDR Portal...")
+            from backend.scripts.seed import seed_database
+            seed_database(drop_existing=False)
+            print("[✓] Initial seed completed successfully.")
+    except Exception as e:
+        print(f"[!] Startup seed check: {e}")
+    finally:
+        db.close()
+    yield
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Prama: Cryptographic Trust, Forensic Verification & Risk Intelligence for AICTE Regulation Bureau"
+    description="Prama: Cryptographic Trust, Forensic Verification & Risk Intelligence for AICTE Regulation Bureau",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -27,6 +46,11 @@ origins = [
     "http://localhost:3001",
     "http://127.0.0.1:3001",
 ]
+if settings.CORS_ORIGINS:
+    for o in settings.CORS_ORIGINS.split(","):
+        cleaned = o.strip()
+        if cleaned and cleaned not in origins:
+            origins.append(cleaned)
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,22 +79,6 @@ app.include_router(knowledge_api.router, prefix=settings.API_V1_PREFIX)
 app.include_router(copilot.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(flags.router, prefix=settings.API_V1_PREFIX)
-
-@app.on_event("startup")
-def on_startup():
-    from backend.app.models.database import SessionLocal
-    from backend.app.models.entities import User
-    db = SessionLocal()
-    try:
-        if db.query(User).count() == 0:
-            print("[*] Database is empty. Running initial statutory seed for AICTE FDR Portal...")
-            from backend.scripts.seed import seed_database
-            seed_database(drop_existing=False)
-            print("[✓] Initial seed completed successfully.")
-    except Exception as e:
-        print(f"[!] Startup seed check: {e}")
-    finally:
-        db.close()
 
 @app.get("/health")
 def health_check():

@@ -5,8 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { 
   X, ChevronRight, ChevronLeft, ShieldCheck, 
-  FileText, CheckCircle2, UserCheck, AlertTriangle, 
-  Sparkles, Landmark, Clock, ArrowRight, Network, Lock,
+  FileText, Clock, ArrowRight, Network, Lock,
   BarChart3, ExternalLink
 } from "lucide-react";
 import PramaLogo from "./PramaLogo";

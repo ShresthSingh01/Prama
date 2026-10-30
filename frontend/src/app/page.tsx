@@ -5,8 +5,8 @@ import Link from "next/link";
 import { 
   AlertTriangle, ArrowUpRight, TrendingUp,
   FileCheck2, CheckCircle2, ShieldAlert, ChevronRight,
-  Landmark, HelpCircle, Sparkles, Network, Building2,
-  FileText, Clock, Download, Check, FileSpreadsheet, RotateCw, Users
+  Landmark, HelpCircle, Network, Building2,
+  FileText, Clock, Download, FileSpreadsheet, RotateCw
 } from "lucide-react";
 import { fetchApi, getCurrentUser, API_BASE } from "@/lib/api";
 import WalkthroughModal from "@/components/WalkthroughModal";
@@ -268,7 +268,7 @@ export default function DashboardPage() {
                 Registered Security Deposits & Fixed Deposit Receipts
               </h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                Official records of your college's security deposits lodged with AICTE Regulation Bureau.
+                Official records of your college&apos;s security deposits lodged with AICTE Regulation Bureau.
               </p>
             </div>
           </div>

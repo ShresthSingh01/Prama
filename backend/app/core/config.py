@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Load .env from root or backend directory
@@ -44,9 +44,10 @@ class Settings(BaseSettings):
     KNOWLEDGE_DIR: str = os.getenv("KNOWLEDGE_DIR", str(BASE_DIR.parent / "knowledge"))
     KNOWLEDGE_SOURCES_DIR: str = os.getenv("KNOWLEDGE_SOURCES_DIR", str(BASE_DIR.parent / "knowledge_sources"))
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    # CORS Extra Origins (comma-separated for cloud deployments e.g. https://prama.vercel.app)
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "")
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
 

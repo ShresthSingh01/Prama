@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from backend.app.models.entities import (
     Instrument, Bank, Institution, Flag, 
-    FlagSeverityEnum, Document
+    FlagSeverityEnum, Document, utc_now
 )
 from backend.app.core.crypto import hamming_distance
 from backend.app.services.knowledge import get_rule_parameter
@@ -81,7 +81,7 @@ def evaluate_instrument_rules(db: Session, instrument: Instrument, ocr_data: Opt
 
     # R05: Dates plausible (issue date not in distant future)
     try:
-        now_dt = datetime.utcnow()
+        now_dt = utc_now()
         issue_dt = datetime.strptime(instrument.issue_date, "%Y-%m-%d")
         if issue_dt > now_dt + timedelta(days=1):
             new_flags.append({

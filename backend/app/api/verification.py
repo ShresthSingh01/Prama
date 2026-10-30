@@ -8,7 +8,7 @@ from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, Bank, Verification, FieldProvenance,
     Flag, InstrumentStatusEnum, TrustTierEnum, 
-    ProvenanceSourceEnum, FlagSeverityEnum, User
+    ProvenanceSourceEnum, FlagSeverityEnum, User, utc_now
 )
 from backend.app.services.qr_service import verify_bank_signed_qr_payload
 from backend.app.services.audit_service import log_audit_entry
@@ -136,7 +136,7 @@ def create_bank_verify_link(id: int, db: Session = Depends(get_db)):
         
     token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = utc_now() + timedelta(days=7)
     
     ver = Verification(
         instrument_id=inst.id,
@@ -164,7 +164,7 @@ def create_bank_verify_link(id: int, db: Session = Depends(get_db)):
 def get_bank_verify_data(token: str, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     ver = db.query(Verification).filter(Verification.token_hash == token_hash).first()
-    if not ver or (ver.expires_at and ver.expires_at < datetime.utcnow()):
+    if not ver or (ver.expires_at and ver.expires_at < utc_now()):
         raise HTTPException(status_code=404, detail="Verification link invalid or expired")
         
     inst = ver.instrument
@@ -190,18 +190,27 @@ def get_bank_verify_data(token: str, db: Session = Depends(get_db)):
 @router.post("/bank-verify/{token}")
 def submit_bank_confirmation(token: str, req: BankConfirmRequest, db: Session = Depends(get_db)):
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    ver = db.query(Verification).filter(Verification.token_hash == token_hash).first()
-    if not ver or (ver.expires_at and ver.expires_at < datetime.utcnow()):
-        raise HTTPException(status_code=400, detail="Verification link invalid or expired")
-        
-    if ver.responded_at is not None:
+    now_ts = utc_now()
+
+    # Atomic conditional update prevents concurrent replay race conditions
+    updated_rows = db.query(Verification).filter(
+        Verification.token_hash == token_hash,
+        Verification.responded_at.is_(None)
+    ).update({
+        Verification.responded_at: now_ts,
+        Verification.result: "confirmed" if req.decision == "confirmed" else "denied",
+        Verification.responder_email: req.officer_email,
+        Verification.evidence: {"remarks": req.remarks, "decision": req.decision}
+    }, synchronize_session="fetch")
+
+    if updated_rows == 0:
+        ver = db.query(Verification).filter(Verification.token_hash == token_hash).first()
+        if not ver or (ver.expires_at and ver.expires_at < now_ts):
+            raise HTTPException(status_code=400, detail="Verification link invalid or expired")
         raise HTTPException(status_code=400, detail="Verification token has already been consumed. Replay rejected.")
-        
+
+    ver = db.query(Verification).filter(Verification.token_hash == token_hash).first()
     inst = ver.instrument
-    ver.result = "confirmed" if req.decision == "confirmed" else "denied"
-    ver.responded_at = datetime.utcnow()
-    ver.responder_email = req.officer_email
-    ver.evidence = {"remarks": req.remarks, "decision": req.decision}
     
     if req.decision == "confirmed":
         for p in inst.provenance_fields:

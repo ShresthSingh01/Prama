@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  RotateCw, X, CheckCircle2, AlertTriangle, FileText, Upload, 
-  Calendar, Landmark, ShieldCheck, ArrowRight
+  RotateCw, X, AlertTriangle
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -72,6 +71,8 @@ export default function RenewalModal({
     setSubmitting(true);
     try {
       const renewPayload = {
+        institution_id: (parentInstrument as any).institution_id,
+        bank_id: (parentInstrument as any).bank_id,
         fdr_number: fdrNumber.trim(),
         amount: Number(amount),
         issue_date: issueDate,
@@ -93,7 +94,7 @@ export default function RenewalModal({
       if (file && res.renewed_instrument_id) {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("kind", "fdr_receipt");
+        formData.append("kind", "FDR_RECEIPT");
         await fetchApi(`/instruments/${res.renewed_instrument_id}/documents`, {
           method: "POST",
           body: formData

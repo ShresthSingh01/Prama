@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.app.models.database import get_db
-from backend.app.models.entities import Flag, Instrument, User, InstrumentStatusEnum
+from backend.app.models.entities import Flag, Instrument, User, InstrumentStatusEnum, utc_now
 from backend.app.services.audit_service import log_audit_entry
 from backend.app.services.risk_service import compute_instrument_risk_score
 from backend.app.schemas.api_schemas import FlagActionRequest
@@ -26,12 +26,18 @@ def resolve_flag(
     if not flag:
         raise HTTPException(status_code=404, detail="Flag not found")
 
+    if current_user and current_user.role == "institution_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Institutions are not authorized to resolve regulatory flags."
+        )
+
     user_id = current_user.id if current_user else 1
     user_role = current_user.role if current_user else "scrutiny_officer"
     
     flag.status = "resolved"
     flag.resolved_by = user_id
-    flag.resolved_at = datetime.utcnow()
+    flag.resolved_at = utc_now()
     
     current_evidence = dict(flag.evidence) if isinstance(flag.evidence, dict) else {}
     current_evidence["resolution_remarks"] = payload.remarks or "Flag marked as resolved by statutory scrutiny officer."
@@ -84,12 +90,18 @@ def dismiss_flag(
     if not flag:
         raise HTTPException(status_code=404, detail="Flag not found")
 
+    if current_user and current_user.role == "institution_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Institutions are not authorized to dismiss regulatory flags."
+        )
+
     user_id = current_user.id if current_user else 1
     user_role = current_user.role if current_user else "scrutiny_officer"
     
     flag.status = "dismissed"
     flag.resolved_by = user_id
-    flag.resolved_at = datetime.utcnow()
+    flag.resolved_at = utc_now()
     
     current_evidence = dict(flag.evidence) if isinstance(flag.evidence, dict) else {}
     current_evidence["dismissal_remarks"] = payload.remarks or "Flag dismissed as false positive by statutory scrutiny officer."

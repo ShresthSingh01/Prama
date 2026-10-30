@@ -4,6 +4,7 @@ from typing import Any, Dict
 from PIL import Image, ImageDraw, ImageFont
 import qrcode
 from backend.app.core.config import settings
+from backend.app.models.entities import utc_now
 
 def generate_release_certificate(db: Any, release_req: Any) -> str:
     """
@@ -22,7 +23,7 @@ def generate_release_certificate(db: Any, release_req: Any) -> str:
     bank_name = inst.bank.name if inst.bank else "Scheduled Commercial Bank"
     fdr_no = inst.fdr_number
     amount_str = f"INR {inst.amount:,.2f}"
-    decided_date = release_req.decided_at.strftime("%d-%b-%Y") if release_req.decided_at else datetime.utcnow().strftime("%d-%b-%Y")
+    decided_date = release_req.decided_at.strftime("%d-%b-%Y") if release_req.decided_at else utc_now().strftime("%d-%b-%Y")
     audit_hash = release_req.certificate_hash or "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
     # Standard A4 dimensions at 150 DPI: 1240 x 1754 px

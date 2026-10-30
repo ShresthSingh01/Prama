@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   ReactFlow,
@@ -17,10 +17,9 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
-  Network, AlertTriangle, ShieldAlert, Sparkles,
-  Building2, Landmark, FileText, ChevronRight, RefreshCw,
-  Info, Eye, ArrowRight,
-  ExternalLink, CheckCircle2, X, Filter
+  Network, ShieldAlert,
+  Building2, Landmark, FileText, ChevronRight,
+  Info, Eye, X
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";

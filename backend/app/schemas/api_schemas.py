@@ -62,8 +62,8 @@ class InstrumentOut(BaseModel):
     joint_holding_confirmed: Optional[bool] = False
 
 class InstrumentCreate(BaseModel):
-    institution_id: int
-    bank_id: int
+    institution_id: Optional[int] = None
+    bank_id: Optional[int] = None
     fdr_number: str
     amount: float
     issue_date: str

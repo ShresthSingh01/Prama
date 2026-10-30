@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from collections import defaultdict
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -7,45 +7,54 @@ from sqlalchemy import func
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, Flag, Verification, ReleaseRequest, Institution,
-    Reminder, ReminderRule, InstrumentStatusEnum, TrustTierEnum
+    Reminder, ReminderRule, InstrumentStatusEnum, TrustTierEnum, User
 )
 from backend.app.services.clock_service import get_simulated_now
+from backend.app.api.auth import get_optional_user
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard Intelligence"])
 
 @router.get("/summary")
-def get_dashboard_summary(db: Session = Depends(get_db)):
-    """Computes all summary statistics live from the database."""
+def get_dashboard_summary(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """Computes all summary statistics live from the database with tenant isolation."""
     simulated_now = get_simulated_now(db)
+    inst_scope_id = None
+    if current_user and current_user.role == "institution_admin":
+        inst_scope_id = current_user.institution_id
     
-    total_count = db.query(Instrument).count()
-    total_amount = db.query(func.sum(Instrument.amount)).scalar() or 0.0
+    inst_filter = [Instrument.institution_id == inst_scope_id] if inst_scope_id else []
+
+    total_count = db.query(Instrument).filter(*inst_filter).count()
+    total_amount = db.query(func.sum(Instrument.amount)).filter(*inst_filter).scalar() or 0.0
     
     # Status Breakdown
-    status_counts = dict(
-        db.query(Instrument.status, func.count(Instrument.id))
-        .group_by(Instrument.status)
-        .all()
-    )
+    status_query = db.query(Instrument.status, func.count(Instrument.id))
+    if inst_scope_id:
+        status_query = status_query.filter(Instrument.institution_id == inst_scope_id)
+    status_counts = dict(status_query.group_by(Instrument.status).all())
     
     # Trust Tier Breakdown
-    tier_counts = dict(
-        db.query(Instrument.trust_tier, func.count(Instrument.id))
-        .group_by(Instrument.trust_tier)
-        .all()
-    )
+    tier_query = db.query(Instrument.trust_tier, func.count(Instrument.id))
+    if inst_scope_id:
+        tier_query = tier_query.filter(Instrument.institution_id == inst_scope_id)
+    tier_counts = dict(tier_query.group_by(Instrument.trust_tier).all())
     
     # Risk Band Breakdown
-    risk_counts = dict(
-        db.query(Instrument.risk_band, func.count(Instrument.id))
-        .group_by(Instrument.risk_band)
-        .all()
-    )
+    risk_query = db.query(Instrument.risk_band, func.count(Instrument.id))
+    if inst_scope_id:
+        risk_query = risk_query.filter(Instrument.institution_id == inst_scope_id)
+    risk_counts = dict(risk_query.group_by(Instrument.risk_band).all())
     
     # Expiring Within 30 / 60 / 90 Days (query column only for minimal memory/DB overhead)
-    expiring_rows = db.query(Instrument.maturity_date).filter(
+    expiring_query = db.query(Instrument.maturity_date).filter(
         Instrument.status.in_([InstrumentStatusEnum.ACTIVE.value, InstrumentStatusEnum.EXPIRING.value])
-    ).all()
+    )
+    if inst_scope_id:
+        expiring_query = expiring_query.filter(Instrument.institution_id == inst_scope_id)
+    expiring_rows = expiring_query.all()
     
     expiring_30 = 0
     expiring_60 = 0
@@ -64,8 +73,13 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         except Exception:
             pass
 
-    open_flags = db.query(Flag).filter(Flag.status == "open").count()
-    pending_releases = db.query(ReleaseRequest).filter(ReleaseRequest.status.in_(["submitted", "under_review"])).count()
+    flag_query = db.query(Flag).filter(Flag.status == "open")
+    release_query = db.query(ReleaseRequest).filter(ReleaseRequest.status.in_(["submitted", "under_review"]))
+    if inst_scope_id:
+        flag_query = flag_query.join(Instrument).filter(Instrument.institution_id == inst_scope_id)
+        release_query = release_query.join(Instrument).filter(Instrument.institution_id == inst_scope_id)
+    open_flags = flag_query.count()
+    pending_releases = release_query.count()
     
     return {
         "simulated_date": simulated_now.strftime("%Y-%m-%d"),
@@ -230,14 +244,21 @@ def list_institution_summaries(db: Session = Depends(get_db)):
     return results
 
 @router.get("/reminders")
-def list_statutory_reminders(db: Session = Depends(get_db)):
+def list_statutory_reminders(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
     """Returns fired automated reminder and escalation notices (PS 26265 Items 4 & 7)."""
     from backend.app.services.slm_tasks import generate_hindi_reminder_draft
 
-    reminders = db.query(Reminder).options(
+    query = db.query(Reminder).options(
         joinedload(Reminder.instrument).joinedload(Instrument.institution),
         joinedload(Reminder.rule)
-    ).order_by(Reminder.id.desc()).limit(100).all()
+    )
+    if current_user and current_user.role == "institution_admin":
+        query = query.join(Instrument).filter(Instrument.institution_id == current_user.institution_id)
+
+    reminders = query.order_by(Reminder.id.desc()).limit(100).all()
 
     items = []
     for r in reminders:
@@ -248,10 +269,13 @@ def list_statutory_reminders(db: Session = Depends(get_db)):
         mat_date = inst.maturity_date if inst else "N/A"
         rule_name = r.rule.name if r.rule else f"Level {r.level} Statutory Notice"
         
-        # Safe Hindi notice draft with guaranteed fidelity
+        template_msg = f"Statutory Notice: Fixed Deposit {fdr_num} of Rs {amt:,.2f} matures on {mat_date}."
         try:
             hindi_draft = generate_hindi_reminder_draft(
-                f"Statutory Notice: Fixed Deposit {fdr_num} of Rs {amt:,.2f} matures on {mat_date}."
+                template_text=template_msg,
+                fdr_number=fdr_num,
+                amount=amt,
+                maturity_date=mat_date
             )
         except Exception:
             hindi_draft = f"सांविधिक सूचना: सावधि जमा (FDR) {fdr_num} राशि ₹{amt:,.2f} की परिपक्वता तिथि {mat_date} है।"

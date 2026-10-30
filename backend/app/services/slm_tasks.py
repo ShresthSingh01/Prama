@@ -168,18 +168,25 @@ def generate_flag_explanation_slm(
 
 # --- Task C: Hindi Reminder Draft ---
 
+_HINDI_DRAFT_CACHE: Dict[str, str] = {}
+
 def generate_hindi_reminder_draft(
     template_text: str,
-    fdr_number: str,
-    amount: float,
-    maturity_date: str,
+    fdr_number: str = "",
+    amount: float = 0.0,
+    maturity_date: str = "",
     client: Optional[LLMClient] = None
 ) -> str:
     """
     Task C: Hindi Reminder Draft.
     Guarded: The translated text must preserve the FDR number, amount, and date unchanged.
+    Cached for high performance to prevent repeated external LLM roundtrips during periodic dashboard polling.
     """
-    if client is None:
+    cache_key = f"{fdr_number}:{amount}:{maturity_date}"
+    if client is None and cache_key in _HINDI_DRAFT_CACHE:
+        return _HINDI_DRAFT_CACHE[cache_key]
+
+    if not client:
         client = get_llm_client()
 
     prompt = (
@@ -192,14 +199,19 @@ def generate_hindi_reminder_draft(
 
     try:
         translated = client.generate(prompt, max_tokens=220)
-        # Invariance check: fdr_number must appear
-        clean_trans = translated.replace(" ", "")
-        if fdr_number.replace(" ", "") not in clean_trans:
-            logger.warning("Reminder translation guard failed: FDR number missing. Using template.")
+        # Invariance check: fdr_number must appear if provided
+        if fdr_number and fdr_number.replace(" ", "") not in translated.replace(" ", ""):
+            logger.warning("Reminder translation guard failed: FDR number missing. Using fallback.")
+            if client is None:
+                _HINDI_DRAFT_CACHE[cache_key] = template_text
             return template_text
+        if client is None:
+            _HINDI_DRAFT_CACHE[cache_key] = translated
         return translated
     except Exception as e:
         logger.warning(f"Reminder translation failed: {e}")
+        if client is None:
+            _HINDI_DRAFT_CACHE[cache_key] = template_text
         return template_text
 
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { 
   Building2, CheckCircle2, XCircle, AlertTriangle, ShieldCheck, 
-  Landmark, ArrowRight, FileCheck, Lock, Clock, Calendar, ExternalLink
+  Landmark, Lock
 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
@@ -94,7 +94,7 @@ export default function BankVerifyPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || "Submission failed");
       }
-      const result = await res.json();
+      await res.json();
       setActionSuccess(decision === "confirmed" 
         ? "Instrument successfully verified and confirmed! Provenance upgraded to BANK_CONFIRMED."
         : "Instrument disowned. Critical forgery notice dispatched to AICTE Vigilance Bureau."

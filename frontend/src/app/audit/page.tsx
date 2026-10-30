@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  Lock, CheckCircle2, XCircle, ShieldAlert, 
-  Sparkles, Hash, HelpCircle, ShieldCheck
+  Lock, CheckCircle2, XCircle, ShieldAlert
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 
@@ -31,7 +30,7 @@ interface AuditVerifyResult {
 export default function AuditLedgerPage() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [total, setTotal] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [_loading, setLoading] = useState<boolean>(true);
   const [verifyResult, setVerifyResult] = useState<AuditVerifyResult | null>(null);
   const [verifying, setVerifying] = useState<boolean>(false);
   const [sabotaging, setSabotaging] = useState<boolean>(false);

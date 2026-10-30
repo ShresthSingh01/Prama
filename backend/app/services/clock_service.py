@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from backend.app.models.entities import (
     SystemClock, Instrument, InstrumentStatusEnum, 
-    Reminder, ReminderRule, AuditLog
+    Reminder, ReminderRule, AuditLog, utc_now
 )
 from backend.app.services.audit_service import log_audit_entry
 
@@ -18,13 +18,13 @@ def get_system_clock(db: Session) -> SystemClock:
 
 def get_simulated_now(db: Session) -> datetime:
     clock = get_system_clock(db)
-    return datetime.utcnow() + timedelta(days=clock.offset_days)
+    return utc_now() + timedelta(days=clock.offset_days)
 
 def advance_simulated_clock(db: Session, days: int) -> Dict[str, Any]:
     """Advances regulatory simulated clock and triggers time-dependent lifecycle events."""
     clock = get_system_clock(db)
     clock.offset_days += days
-    clock.updated_at = datetime.utcnow()
+    clock.updated_at = utc_now()
     db.commit()
     
     simulated_now = get_simulated_now(db)

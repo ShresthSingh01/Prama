@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from backend.app.models.database import get_db
-from backend.app.models.entities import EvalRun, EvalSlmRun, Bank
+from backend.app.models.entities import EvalRun, EvalSlmRun, Bank, utc_now
 from backend.app.services.qr_service import generate_bank_signed_qr, verify_bank_signed_qr_payload
 from backend.app.services.llm_client import get_llm_client
 from backend.app.services.slm_tasks import extract_fdr_fields_slm, apply_hallucination_guard
@@ -102,7 +102,7 @@ def run_evaluation_benchmark(db: Session = Depends(get_db)):
         precision=precision,
         recall=recall,
         f1=f1,
-        created_at=datetime.utcnow()
+        created_at=utc_now()
     )
     db.add(run)
     db.commit()
@@ -229,7 +229,7 @@ def run_slm_extraction_benchmark(db: Session = Depends(get_db)):
         "null_rate": round((total_fields - slm_correct) / max(1, total_fields), 4),
         "avg_latency_ms": avg_latency,
         "p95_latency_ms": max(latencies) if latencies else avg_latency,
-        "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        "created_at": utc_now().strftime("%Y-%m-%d %H:%M:%S UTC")
     }
 
     run = EvalSlmRun(
@@ -237,7 +237,7 @@ def run_slm_extraction_benchmark(db: Session = Depends(get_db)):
         provider=provider,
         task="extraction",
         metrics=metrics,
-        created_at=datetime.utcnow()
+        created_at=utc_now()
     )
     db.add(run)
     db.commit()
@@ -320,7 +320,7 @@ def run_copilot_citation_benchmark(db: Session = Depends(get_db)):
         "citation_hit_rate": citation_hit_rate,
         "refusal_accuracy": refusal_accuracy,
         "unsupported_answer_rate": unsupported_rate,
-        "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        "created_at": utc_now().strftime("%Y-%m-%d %H:%M:%S UTC")
     }
 
     run = EvalSlmRun(
@@ -328,7 +328,7 @@ def run_copilot_citation_benchmark(db: Session = Depends(get_db)):
         provider=provider,
         task="copilot_citation",
         metrics=metrics,
-        created_at=datetime.utcnow()
+        created_at=utc_now()
     )
     db.add(run)
     db.commit()

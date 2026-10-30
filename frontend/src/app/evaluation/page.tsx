@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  Activity, CheckCircle2, AlertTriangle, Play, 
-  RefreshCw, Zap, Sparkles, BookOpen
+  Activity, RefreshCw
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 

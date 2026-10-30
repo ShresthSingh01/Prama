@@ -144,10 +144,12 @@ def test_07_maker_checker_release_enforcement():
             create_res = client.post("/api/v1/instruments", json=inst_payload)
             clean_inst = db.query(Instrument).filter(Instrument.id == create_res.json()["id"]).first()
 
-        # Ensure test instrument satisfies AICTE Clause 6.46 preconditions (matured, bank confirmed, FDR receipt attached)
+        # Ensure test instrument satisfies AICTE Clause 6.46 preconditions (matured, bank confirmed, FDR receipt attached, zero open flags)
         clean_inst.maturity_date = "2024-01-01"
         clean_inst.status = "MATURED"
         clean_inst.trust_tier = "BANK_CONFIRMED"
+        for f in clean_inst.flags:
+            f.status = "resolved"
         has_receipt = any(d.kind == "FDR_RECEIPT" for d in clean_inst.documents)
         if not has_receipt:
             doc = Document(instrument_id=clean_inst.id, kind="FDR_RECEIPT", storage_key="test_receipt.pdf", sha256="test_sha256")

@@ -57,6 +57,16 @@ class PageIndexAdapter:
         finally:
             db.close()
 
+        if not self.trees:
+            pdf_candidate = Path("knowledge_sources/aicte_approval_process_handbook_fdr_clauses.pdf")
+            if not pdf_candidate.exists():
+                pdf_candidate = Path(__file__).resolve().parent.parent.parent / "knowledge_sources" / "aicte_approval_process_handbook_fdr_clauses.pdf"
+            if pdf_candidate.exists():
+                try:
+                    self.build(str(pdf_candidate))
+                except Exception as e:
+                    logger.warning(f"Could not automatically build PageIndex tree: {e}")
+
     def build(self, pdf_path: str) -> str:
         """Parses a PDF into a hierarchical regulation tree and caches it."""
         sha256 = compute_file_sha256(pdf_path)

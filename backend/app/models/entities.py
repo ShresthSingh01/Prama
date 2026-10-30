@@ -1,6 +1,10 @@
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+
+def utc_now() -> datetime:
+    """Returns naive UTC datetime without Python 3.12+ deprecation warnings."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, ForeignKey, 
     Text, Boolean, JSON, Index, func
@@ -58,7 +62,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default=RoleEnum.INSTITUTION_ADMIN.value)
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     institution = relationship("Institution", back_populates="users")
 
@@ -73,7 +77,7 @@ class Institution(Base):
     email = Column(String(150), nullable=False)
     phone = Column(String(50), nullable=True)
     compliance_score = Column(Float, default=100.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     users = relationship("User", back_populates="institution")
     instruments = relationship("Instrument", back_populates="institution")
@@ -88,7 +92,7 @@ class Bank(Base):
     layout_fingerprint = Column(JSON, nullable=True)
     public_key = Column(String(128), nullable=False)   # Ed25519 public key in hex
     private_key = Column(String(128), nullable=True)  # Ed25519 private key for mock issuance
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     instruments = relationship("Instrument", back_populates="bank")
 
@@ -112,7 +116,7 @@ class Instrument(Base):
     parent_instrument_id = Column(Integer, ForeignKey("instruments.id"), nullable=True)
     lien_marked = Column(Boolean, default=False, nullable=True)
     joint_holding_confirmed = Column(Boolean, default=False, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     institution = relationship("Institution", back_populates="instruments")
     bank = relationship("Bank", back_populates="instruments")
@@ -134,7 +138,7 @@ class FieldProvenance(Base):
     value = Column(String(255), nullable=True)
     source = Column(String(50), default=ProvenanceSourceEnum.SELF_DECLARED.value)
     confidence = Column(Float, default=1.0)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     instrument = relationship("Instrument", back_populates="provenance_fields")
 
@@ -149,7 +153,7 @@ class Document(Base):
     phash = Column(String(32), nullable=True, index=True)
     mime = Column(String(50), default="application/pdf")
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     instrument = relationship("Instrument", back_populates="documents")
     ocr_result = relationship("OcrResult", uselist=False, back_populates="document", cascade="all, delete-orphan")
@@ -166,7 +170,7 @@ class OcrResult(Base):
     slm_fields = Column(JSON, nullable=True)
     slm_model = Column(String(100), nullable=True)
     slm_latency_ms = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     document = relationship("Document", back_populates="ocr_result")
 
@@ -183,7 +187,7 @@ class Flag(Base):
     evidence = Column(JSON, nullable=True)
     status = Column(String(20), default="open")  # open, resolved, dismissed
     raised_by = Column(String(50), default="system")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     resolved_at = Column(DateTime, nullable=True)
 
@@ -201,7 +205,7 @@ class Verification(Base):
     responded_at = Column(DateTime, nullable=True)
     responder_email = Column(String(150), nullable=True)
     evidence = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     instrument = relationship("Instrument", back_populates="verifications")
 
@@ -229,7 +233,7 @@ class Reminder(Base):
     status = Column(String(50), default="SENT")
     recipient = Column(String(150), nullable=True)
     message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     instrument = relationship("Instrument", back_populates="reminders")
     rule = relationship("ReminderRule")
@@ -247,7 +251,7 @@ class ReleaseRequest(Base):
     remarks = Column(Text, nullable=True)
     certificate_url = Column(String(255), nullable=True)
     certificate_hash = Column(String(64), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     decided_at = Column(DateTime, nullable=True)
 
     instrument = relationship("Instrument", back_populates="release_requests")
@@ -259,7 +263,7 @@ class Observation(Base):
     instrument_id = Column(Integer, ForeignKey("instruments.id"), nullable=False, index=True)
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     text = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     instrument = relationship("Instrument", back_populates="observations")
     author = relationship("User")
@@ -268,7 +272,7 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    ts = Column(DateTime, default=datetime.utcnow, nullable=False)
+    ts = Column(DateTime, default=utc_now, nullable=False)
     actor_id = Column(Integer, nullable=True)
     actor_role = Column(String(50), nullable=True)
     action = Column(String(100), nullable=False, index=True)
@@ -283,7 +287,7 @@ class SystemClock(Base):
     
     id = Column(Integer, primary_key=True)
     offset_days = Column(Integer, default=0)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 class EvalRun(Base):
     __tablename__ = "eval_runs"
@@ -297,7 +301,7 @@ class EvalRun(Base):
     precision = Column(Float, default=0.0)
     recall = Column(Float, default=0.0)
     f1 = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 class DocIndexCache(Base):
     __tablename__ = "doc_index_cache"
@@ -308,7 +312,7 @@ class DocIndexCache(Base):
     doc_id = Column(String(100), nullable=False, index=True)
     tree = Column(JSON, nullable=False)
     built_with = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 class CopilotQuery(Base):
     __tablename__ = "copilot_queries"
@@ -319,7 +323,7 @@ class CopilotQuery(Base):
     question = Column(Text, nullable=False)
     cited = Column(JSON, nullable=True)
     answer = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 class EvalSlmRun(Base):
     __tablename__ = "eval_slm_runs"
@@ -329,4 +333,4 @@ class EvalSlmRun(Base):
     provider = Column(String(50), default="gemini")
     task = Column(String(100), nullable=False)
     metrics = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)

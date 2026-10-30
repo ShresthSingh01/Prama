@@ -11,7 +11,7 @@ from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, Institution, Bank, Document, FieldProvenance,
     Flag, Verification, Observation, User, InstrumentStatusEnum,
-    TrustTierEnum, ProvenanceSourceEnum, OcrResult
+    TrustTierEnum, ProvenanceSourceEnum, OcrResult, utc_now
 )
 from backend.app.core.config import settings
 from backend.app.core.crypto import compute_file_sha256, compute_image_dhash
@@ -261,7 +261,8 @@ def create_instrument(
 ):
     target_institution_id = req.institution_id
     if current_user and current_user.role == "institution_admin":
-        target_institution_id = current_user.institution_id or req.institution_id
+        if current_user.institution_id:
+            target_institution_id = current_user.institution_id
 
     inst = Instrument(
         institution_id=target_institution_id,
@@ -424,6 +425,9 @@ async def upload_document(
     if current_user:
         check_institution_access(current_user, inst.institution_id)
         
+    if current_user:
+        check_institution_access(current_user, inst.institution_id)
+        
     doc_dir = os.path.join(settings.STORAGE_DIR, "documents")
     os.makedirs(doc_dir, exist_ok=True)
     
@@ -569,6 +573,9 @@ def download_document(
     if current_user:
         check_institution_access(current_user, inst.institution_id)
         
+    if current_user:
+        check_institution_access(current_user, inst.institution_id)
+        
     doc = db.query(Document).filter(Document.id == doc_id, Document.instrument_id == inst.id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -593,6 +600,9 @@ async def add_observation(
     inst = db.query(Instrument).filter(Instrument.id == id).first()
     if not inst:
         raise HTTPException(status_code=404, detail="Instrument not found")
+        
+    if current_user:
+        check_institution_access(current_user, inst.institution_id)
         
     text_val = ""
     content_type = request.headers.get("content-type", "")
@@ -678,6 +688,14 @@ def record_manual_bank_verification(
     inst = db.query(Instrument).filter(Instrument.id == id).first()
     if not inst:
         raise HTTPException(status_code=404, detail="Instrument not found")
+        
+    if current_user:
+        if current_user.role == "institution_admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Institutions are not authorized to attest bank verification records."
+            )
+        check_institution_access(current_user, inst.institution_id)
 
     user_id = current_user.id if current_user else 1
     user_role = current_user.role if current_user else "scrutiny_officer"
@@ -688,7 +706,7 @@ def record_manual_bank_verification(
         method="manual",
         result="valid",
         responder_email=current_user.email if current_user else "attestation@aicte.gov.in",
-        responded_at=datetime.utcnow(),
+        responded_at=utc_now(),
         evidence={
             "dispatch_reference": payload.dispatch_reference,
             "confirmation_date": payload.confirmation_date,

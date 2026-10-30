@@ -4,10 +4,10 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
-  ShieldCheck, Clock, RotateCcw, 
+  Clock, RotateCcw, 
   BarChart3, ListFilter, Network, FileCheck2, FileText, Activity,
   Lock, CheckCircle2, XCircle, BookOpen, Sparkles, Sun, Moon,
-  HelpCircle, ChevronDown, Bell, AlertCircle, X
+  HelpCircle, ChevronDown, Bell, X
 } from "lucide-react";
 import { fetchApi, setAuthSession, getCurrentUser, getAuthToken } from "@/lib/api";
 import { useTheme } from "./ThemeProvider";

@@ -7,14 +7,14 @@ from sqlalchemy.orm import Session, joinedload
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, ReleaseRequest, User, Flag,
-    InstrumentStatusEnum, TrustTierEnum, RoleEnum
+    InstrumentStatusEnum, TrustTierEnum, RoleEnum, utc_now
 )
 from backend.app.core.config import settings
 from backend.app.services.audit_service import log_audit_entry, get_latest_audit_hash
 from backend.app.services.release_policy import evaluate_release_readiness
 from backend.app.services.certificate_service import generate_release_certificate
 from backend.app.schemas.api_schemas import ReleaseRequestCreate, ReleaseDecision
-from backend.app.api.auth import get_optional_user, get_current_user
+from backend.app.api.auth import get_optional_user, get_current_user, check_institution_access
 
 router = APIRouter(prefix="", tags=["Release Workflow"])
 
@@ -193,6 +193,12 @@ def maker_scrutiny(
     if not rel:
         raise HTTPException(status_code=404, detail="Release request not found")
         
+    if current_user and current_user.role == "institution_admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Institutions are not authorized to perform Maker Scrutiny."
+        )
+
     maker_id = current_user.id if current_user else 2
     if decision.decision == "approved":
         rel.status = "under_review"
@@ -224,6 +230,12 @@ def checker_approval(
     if not rel:
         raise HTTPException(status_code=404, detail="Release request not found")
         
+    if current_user and current_user.role == "institution_admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Institutions are not authorized to perform Checker Approval."
+        )
+
     checker_id = current_user.id if current_user else 3
     
     # Enforce Maker-Checker Separation
@@ -236,7 +248,7 @@ def checker_approval(
     if decision.decision == "approved":
         rel.status = "released"
         rel.checker_id = checker_id
-        rel.decided_at = datetime.utcnow()
+        rel.decided_at = utc_now()
         rel.instrument.status = InstrumentStatusEnum.RELEASED.value
         
         # Generate tamper-evident release certificate hash
@@ -249,7 +261,7 @@ def checker_approval(
     else:
         rel.status = "rejected"
         rel.checker_id = checker_id
-        rel.decided_at = datetime.utcnow()
+        rel.decided_at = utc_now()
         rel.instrument.status = InstrumentStatusEnum.ACTIVE.value
         
     db.commit()
@@ -267,13 +279,20 @@ def checker_approval(
     }
 
 @router.get("/release-requests/{id}/certificate")
-def download_release_certificate_pdf(id: int, db: Session = Depends(get_db)):
+def download_release_certificate_pdf(
+    id: int, 
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
     """Downloads authentic, generated AICTE Statutory Lien Discharge Certificate PDF."""
     rel = db.query(ReleaseRequest).filter(ReleaseRequest.id == id).first()
     if not rel:
         raise HTTPException(status_code=404, detail="Release request not found")
     if rel.status != "released":
         raise HTTPException(status_code=400, detail="Certificate is only generated for finalized, released deposits")
+        
+    if current_user and rel.instrument:
+        check_institution_access(current_user, rel.instrument.institution_id)
         
     cert_dir = os.path.join(settings.STORAGE_DIR, "certificates")
     pdf_path = os.path.join(cert_dir, f"release_{rel.id}.pdf")

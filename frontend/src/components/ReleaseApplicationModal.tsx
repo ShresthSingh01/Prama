@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { 
-  FileCheck2, X, CheckCircle2, AlertTriangle, ShieldCheck, 
-  Clock, Landmark, FileText, ArrowRight, Ban
+  FileCheck2, X, CheckCircle2, AlertTriangle, Ban
 } from "lucide-react";
 import { fetchApi } from "@/lib/api";
 

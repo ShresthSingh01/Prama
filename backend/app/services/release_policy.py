@@ -118,9 +118,13 @@ def evaluate_release_readiness(
         blockers.append("Missing required document: Original FDR Receipt copy.")
 
     # 5. Statutory Bureau Clearances (Vigilance, Legal, Finance)
-    if not clearances:
+    if clearances is None:
+        has_fraud_flags = any(
+            f.status == "open" and any(k in f.code for k in ["FORGERY", "TAMPER", "R08", "DISOWNED", "FRAUD", "UNAUTHORIZED"])
+            for f in instrument.flags
+        )
         clearances = {
-            "vigilance": "APPROVED",
+            "vigilance": "PENDING_INQUIRY" if has_fraud_flags else "APPROVED",
             "legal": "APPROVED",
             "finance": "APPROVED"
         }
@@ -147,5 +151,6 @@ def evaluate_release_readiness(
         "is_ready": is_ready,
         "policy_source": "AICTE Approval Process Handbook (APH 2024-2027) Clause 6.46",
         "checklist": checklist,
-        "blockers": blockers
+        "blockers": blockers,
+        "vigilance_clearance": clearances.get("vigilance", "APPROVED")
     }

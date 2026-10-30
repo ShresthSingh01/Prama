@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import { 
-  FileSpreadsheet, Download, X, CheckCircle2, Clock, AlertTriangle, 
-  FileText, ShieldCheck, ChevronRight
+  FileSpreadsheet, Download, X, Clock, AlertTriangle, 
+  FileText
 } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
@@ -66,16 +66,30 @@ export default function StatutoryReportsModal({ isOpen, onClose }: StatutoryRepo
 
   if (!isOpen) return null;
 
-  const handleDownload = (report: ReportItem) => {
+  const handleDownload = async (report: ReportItem) => {
     setDownloadingId(report.id);
-    const downloadUrl = `${API_BASE}/reports/${report.endpoint}?format=csv`;
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = `aicte_${report.endpoint}_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => setDownloadingId(null), 1000);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch(`${API_BASE}/reports/${report.endpoint}?format=csv`, { headers });
+      if (!res.ok) throw new Error("Failed to download statutory report");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `aicte_${report.endpoint}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTimeout(() => setDownloadingId(null), 800);
+    }
   };
 
   return (

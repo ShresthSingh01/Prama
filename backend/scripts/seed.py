@@ -7,7 +7,7 @@ from backend.app.models.entities import (
     User, Institution, Bank, Instrument, FieldProvenance,
     Document, Flag, ReminderRule, SystemClock, 
     InstrumentStatusEnum, TrustTierEnum, ProvenanceSourceEnum,
-    RoleEnum
+    RoleEnum, utc_now
 )
 from backend.app.core.security import hash_password
 from backend.app.core.crypto import generate_ed25519_keypair, compute_chain_hash, canonical_json
@@ -122,6 +122,7 @@ def seed_database(drop_existing: bool = False):
             User(name="Dr. Mamta Agarwal (Director)", email="checker@aicte.gov.in", password_hash=pwd_hash, role=RoleEnum.SENIOR_OFFICER.value),
             User(name="Registrar IIT", email="institute1@iit.ac.in", password_hash=pwd_hash, role=RoleEnum.INSTITUTION_ADMIN.value, institution_id=1),
             User(name="Registrar MIT", email="institute2@mit.edu", password_hash=pwd_hash, role=RoleEnum.INSTITUTION_ADMIN.value, institution_id=2),
+            User(name="College Admin", email="college1@aicte.gov.in", password_hash=pwd_hash, role=RoleEnum.INSTITUTION_ADMIN.value, institution_id=1),
             User(name="SBI Nodal Officer", email="banknodal@sbi.co.in", password_hash=pwd_hash, role=RoleEnum.BANK_OFFICER.value),
         ]
         db.add_all(users)
@@ -173,7 +174,7 @@ def seed_database(drop_existing: bool = False):
             log_audit_entry(db, "SUBMIT_FDR", "instrument", inst_obj.id, {"fdr": shared_fdr_num, "amount": 5000000.0})
 
         print("[*] Generating 600 Varied FDR Instruments Across 24 Months...")
-        today = datetime.utcnow()
+        today = utc_now()
         for idx in range(600):
             institution = random.choice(institutions)
             bank = random.choice(bank_objs)
@@ -248,6 +249,12 @@ def seed_database(drop_existing: bool = False):
                 print(f"   -> Seeded {idx}/600 instruments...")
 
         print("[+] SEEDING COMPLETE! 150 Institutions, 12 Banks, 604 Instruments generated with full audit trail.")
+        try:
+            from backend.scripts.build_page_index import build_all_indices
+            print("[*] Building regulatory PageIndex cache for AICTE Approval Process Handbook...")
+            build_all_indices()
+        except Exception as e:
+            print(f"[!] Warning: PageIndex build failed: {e}")
     finally:
         db.close()
 

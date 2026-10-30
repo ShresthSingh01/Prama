@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import Dict, Any, Tuple, Optional, List
 from sqlalchemy.orm import Session
-from backend.app.models.entities import AuditLog
+from backend.app.models.entities import AuditLog, utc_now
 from backend.app.core.crypto import canonical_json, compute_chain_hash
 
 GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -54,7 +54,7 @@ def log_audit_entry(
         payload=full_payload,
         prev_hash=prev_hash,
         hash=entry_hash,
-        ts=datetime.utcnow()
+        ts=utc_now()
     )
     db.add(entry)
     db.commit()

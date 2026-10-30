@@ -18,6 +18,7 @@ from backend.app.services.knowledge import get_knowledge_bundle, get_rule_parame
 from backend.app.services.rules_engine import evaluate_instrument_rules
 from backend.app.services.document_index import get_document_index
 from backend.app.services.audit_service import verify_audit_chain
+from backend.app.core.config import settings
 
 client = TestClient(app)
 
@@ -193,3 +194,122 @@ def test_09_audit_chain_integrity():
         assert ver["total_entries"] > 0
     finally:
         db.close()
+
+def test_10_institution_dashboard_summary_isolation():
+    """Test 11: Multi-tenant institution isolation restricts dashboard totals and reminders."""
+    login_res = client.post("/api/v1/auth/login", json={"email": "institute1@iit.ac.in", "password": "Password@123"})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Summary scoped to institute1
+    scoped_res = client.get("/api/v1/dashboard/summary", headers=headers)
+    assert scoped_res.status_code == 200
+    scoped_data = scoped_res.json()
+
+    # National summary (unauthenticated or admin)
+    national_res = client.get("/api/v1/dashboard/summary")
+    assert national_res.status_code == 200
+    national_data = national_res.json()
+
+    assert scoped_data["total_instruments"] < national_data["total_instruments"]
+    assert scoped_data["total_instruments"] > 0
+    assert scoped_data["total_security_cover_amount"] < national_data["total_security_cover_amount"]
+
+    # Reminders scoped
+    rem_res = client.get("/api/v1/dashboard/reminders", headers=headers)
+    assert rem_res.status_code == 200
+    reminders = rem_res.json()
+    assert isinstance(reminders, list)
+
+def test_11_rbac_hardened_protections():
+    """Test 12: Role-based access control prevents unauthorized actions by institution admins."""
+    # Log in as institution admin
+    college_token = client.post("/api/v1/auth/login", json={"email": "institute1@iit.ac.in", "password": "Password@123"}).json()["access_token"]
+    c_headers = {"Authorization": f"Bearer {college_token}"}
+
+    # 1. Institution admin cannot resolve or dismiss flags (403)
+    res_flag = client.post("/api/v1/flags/1/resolve", json={"remarks": "Malicious self-resolution"}, headers=c_headers)
+    assert res_flag.status_code == 403
+    assert "not authorized to resolve" in res_flag.json()["detail"].lower()
+
+    dis_flag = client.post("/api/v1/flags/1/dismiss", json={"remarks": "Malicious self-dismissal"}, headers=c_headers)
+    assert dis_flag.status_code == 403
+    assert "not authorized to dismiss" in dis_flag.json()["detail"].lower()
+
+    # 2. Institution admin cannot record manual bank verification (403)
+    mv_res = client.post(
+        "/api/v1/instruments/1/verify/manual",
+        json={"dispatch_reference": "SP-FAKE-123", "confirmation_date": "2026-05-01", "officer_remarks": "Self attestation"},
+        headers=c_headers
+    )
+    assert mv_res.status_code == 403
+    assert "not authorized to attest" in mv_res.json()["detail"].lower()
+
+    # 3. Institution admin cannot perform Maker Scrutiny or Checker Approval (403)
+    maker_res = client.patch(
+        "/api/v1/release-requests/1/maker-scrutiny",
+        json={"decision": "approved", "remarks": "Unauthorized approval"},
+        headers=c_headers
+    )
+    assert maker_res.status_code == 403
+    assert "not authorized to perform maker scrutiny" in maker_res.json()["detail"].lower()
+
+    checker_res = client.patch(
+        "/api/v1/release-requests/1/checker-approval",
+        json={"decision": "approved", "remarks": "Unauthorized checker"},
+        headers=c_headers
+    )
+    assert checker_res.status_code == 403
+    assert "not authorized to perform checker approval" in checker_res.json()["detail"].lower()
+
+def test_12_release_readiness_vigilance_inquiry():
+    """Test 13: Active fraud/tamper flags dynamically put vigilance clearance into PENDING_INQUIRY."""
+    db: Session = SessionLocal()
+    flag = None
+    try:
+        inst = db.query(Instrument).first()
+        # Add open fraud flag
+        flag = Flag(
+            instrument_id=inst.id,
+            code="R08_ELA_COMPRESSION_VARIANCE",
+            severity="CRITICAL",
+            status="open",
+            explanation="Image tampering detected in certificate header."
+        )
+        db.add(flag)
+        db.commit()
+
+        readiness_res = client.get(f"/api/v1/instruments/{inst.id}/release-readiness")
+        assert readiness_res.status_code == 200
+        data = readiness_res.json()
+        vigilance_item = next((c for c in data["checklist"] if c["code"] == "C05_CLEARANCE_VIGILANCE"), None)
+        assert vigilance_item is not None
+        assert vigilance_item["status"] == "BLOCKED"
+        assert "PENDING_INQUIRY" in vigilance_item["detail"]
+        assert data["is_ready"] is False
+    finally:
+        if flag and flag.id:
+            db.delete(flag)
+            db.commit()
+        db.close()
+
+def test_13_demo_mode_sabotage_locks():
+    """Test 14: Simulated sabotage and clock control are locked when DEMO_MODE is False."""
+    orig_demo = settings.DEMO_MODE
+    try:
+        settings.DEMO_MODE = False
+
+        res_sab = client.post("/api/v1/audit/sabotage?entry_id=1")
+        assert res_sab.status_code == 403
+
+        res_res = client.post("/api/v1/audit/restore")
+        assert res_res.status_code == 403
+
+        res_adv = client.post("/api/v1/demo/advance-clock", json={"days": 10})
+        assert res_adv.status_code == 403
+
+        res_rst = client.post("/api/v1/demo/reset-clock")
+        assert res_rst.status_code == 403
+    finally:
+        settings.DEMO_MODE = orig_demo

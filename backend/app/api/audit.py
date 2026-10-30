@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from backend.app.models.database import get_db
 from backend.app.models.entities import AuditLog
+from backend.app.core.config import settings
 from backend.app.services.audit_service import verify_audit_chain, invalidate_audit_cache, repair_audit_chain
 
 router = APIRouter(prefix="/audit", tags=["Cryptographic Audit Ledger"])
@@ -43,6 +44,9 @@ def simulate_database_tampering(entry_id: int, db: Session = Depends(get_db)):
     Alters a block's stored payload without re-hashing the chain to demonstrate
     tamper detection during the SIH pitch.
     """
+    if not settings.DEMO_MODE:
+        raise HTTPException(status_code=403, detail="Simulated sabotage is disabled when DEMO_MODE is false.")
+
     entry = db.query(AuditLog).filter(AuditLog.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Audit entry not found")
@@ -69,6 +73,9 @@ def restore_audit_chain(db: Session = Depends(get_db)):
     Self-healing routine: Cleans any sabotage injection residue and
     recomputes contiguous SHA-256 block hashes, returning chain to verified state.
     """
+    if not settings.DEMO_MODE:
+        raise HTTPException(status_code=403, detail="Audit chain repair is disabled when DEMO_MODE is false.")
+
     result = repair_audit_chain(db)
     return {
         "success": True,

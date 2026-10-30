@@ -9,7 +9,7 @@ import {
   Layers, QrCode, FileText, Eye, ShieldAlert,
   ArrowLeft, Sparkles, Building2, Landmark,
   Clock, HelpCircle, RefreshCw, FileCheck2, X,
-  Scan, Crosshair, ZoomIn, Info, Check, AlertOctagon, Sliders,
+  Scan, Crosshair, Check, AlertOctagon,
   Download, Upload, GitBranch, ExternalLink, XCircle
 } from "lucide-react";
 import { fetchApi, API_BASE } from "@/lib/api";
@@ -135,11 +135,11 @@ export default function DepositInspectorPage() {
   const [forensicLoading, setForensicLoading] = useState<boolean>(false);
   const [forensicMode, setForensicMode] = useState<"scan" | "ela" | "ocr" | "composite">("ocr");
   const [selectedOcrBox, setSelectedOcrBox] = useState<string | null>("ocr_amount");
-  const [elaThreshold, setElaThreshold] = useState<number>(85);
+  const [_elaThreshold, _setElaThreshold] = useState<number>(85);
 
   // Layer Toggles
-  const [showElaHeatmap, setShowElaHeatmap] = useState<boolean>(false);
-  const [showQrDecode, setShowQrDecode] = useState<boolean>(false);
+  const [_showElaHeatmap, _setShowElaHeatmap] = useState<boolean>(false);
+  const [_showQrDecode, _setShowQrDecode] = useState<boolean>(false);
   
   // Verification test states
   const [verifying, setVerifying] = useState<boolean>(false);

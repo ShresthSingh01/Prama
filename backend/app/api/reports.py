@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from backend.app.models.database import get_db
 from backend.app.models.entities import (
     Instrument, Institution, Bank, Document, Flag,
-    InstrumentStatusEnum, TrustTierEnum, FlagSeverityEnum
+    InstrumentStatusEnum, TrustTierEnum, FlagSeverityEnum, User
 )
 from backend.app.services.clock_service import get_simulated_now
+from backend.app.api.auth import get_optional_user
 
 router = APIRouter(prefix="/reports", tags=["Statutory Management Reports"])
 
@@ -35,11 +36,12 @@ def create_csv_response(rows: List[dict], filename: str, default_headers: Option
 @router.get("/pending-verifications")
 def report_pending_verifications(
     format: str = Query("json", pattern="^(json|csv)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """Report 1: Pending Verifications across all scheduled commercial banks."""
     simulated_now = get_simulated_now(db)
-    instruments = (
+    query = (
         db.query(Instrument)
         .options(joinedload(Instrument.institution), joinedload(Instrument.bank))
         .filter(
@@ -49,9 +51,11 @@ def report_pending_verifications(
             ]),
             Instrument.status != InstrumentStatusEnum.RELEASED.value
         )
-        .order_by(Instrument.id.desc())
-        .all()
     )
+    if current_user and current_user.role == "institution_admin":
+        query = query.filter(Instrument.institution_id == current_user.institution_id)
+
+    instruments = query.order_by(Instrument.id.desc()).all()
 
     rows = []
     for inst in instruments:
@@ -77,11 +81,12 @@ def report_pending_verifications(
 def report_upcoming_maturities(
     days: int = Query(90, ge=1, le=365),
     format: str = Query("json", pattern="^(json|csv)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """Report 2: Instruments reaching maturity within prescribed window."""
     simulated_now = get_simulated_now(db)
-    instruments = (
+    query = (
         db.query(Instrument)
         .options(joinedload(Instrument.institution), joinedload(Instrument.bank))
         .filter(
@@ -91,8 +96,11 @@ def report_upcoming_maturities(
                 InstrumentStatusEnum.MATURED.value
             ])
         )
-        .all()
     )
+    if current_user and current_user.role == "institution_admin":
+        query = query.filter(Instrument.institution_id == current_user.institution_id)
+
+    instruments = query.all()
 
     rows = []
     for inst in instruments:
@@ -127,21 +135,25 @@ def report_upcoming_maturities(
 @router.get("/missing-documents")
 def report_missing_documents(
     format: str = Query("json", pattern="^(json|csv)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """Report 3: FDR instruments missing verified supporting records."""
     simulated_now = get_simulated_now(db)
-    instruments = (
+    query = (
         db.query(Instrument)
         .options(joinedload(Instrument.institution), selectinload(Instrument.documents))
         .filter(Instrument.status != InstrumentStatusEnum.RELEASED.value)
-        .all()
     )
+    if current_user and current_user.role == "institution_admin":
+        query = query.filter(Instrument.institution_id == current_user.institution_id)
+
+    instruments = query.all()
 
     rows = []
     for inst in instruments:
         doc_count = len(inst.documents)
-        has_fdr_receipt = any(d.kind == "FDR_RECEIPT" for d in inst.documents)
+        has_fdr_receipt = any(str(d.kind).upper() == "FDR_RECEIPT" for d in inst.documents)
         if doc_count == 0 or not has_fdr_receipt:
             rows.append({
                 "fdr_number": inst.fdr_number,
@@ -160,11 +172,12 @@ def report_missing_documents(
 @router.get("/intervention-cases")
 def report_intervention_cases(
     format: str = Query("json", pattern="^(json|csv)$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """Report 4: High risk, discrepant or overdue cases requiring regulatory intervention."""
     simulated_now = get_simulated_now(db)
-    instruments = (
+    query = (
         db.query(Instrument)
         .options(
             joinedload(Instrument.institution),
@@ -175,9 +188,11 @@ def report_intervention_cases(
             (Instrument.status.in_([InstrumentStatusEnum.FLAGGED.value, InstrumentStatusEnum.OVERDUE.value])) |
             (Instrument.risk_band.in_(["CRITICAL", "HIGH"]))
         )
-        .order_by(Instrument.risk_score.desc())
-        .all()
     )
+    if current_user and current_user.role == "institution_admin":
+        query = query.filter(Instrument.institution_id == current_user.institution_id)
+
+    instruments = query.order_by(Instrument.risk_score.desc()).all()
 
     rows = []
     for inst in instruments:
