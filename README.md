@@ -458,9 +458,8 @@ SIH2nd/
 
 ---
 
-## SIH Evaluation Criteria Verification
-
-| Evaluation Pillar | Jury Verification Step | Result |
+## Criteria Verification
+| Evaluation Pillar | Verification Step | Result |
 |---|---|:---:|
 | **Novelty & Innovation** | Check Ed25519 offline QR verification, ELA heatmaps, and Syndicate Graph. | ⭐⭐⭐⭐⭐ **Exemplary** |
 | **Technical Feasibility** | Pure Python/TypeScript stack running entirely on standard Windows/Linux machines without Docker or cloud prerequisites. | ⭐⭐⭐⭐⭐ **100% Operational** |
